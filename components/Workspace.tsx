@@ -7,6 +7,9 @@ import MigrationModal from './MigrationModal';
 import LineChartMonthly from './charts/LineChartMonthly';
 import DonutChartCategories from './charts/DonutChartCategories';
 import BudgetProgress from './charts/BudgetProgress';
+import Insights from './Insights';
+import SyncStatus from './SyncStatus';
+import { exportToCSV, exportToJSON, getExportFilename } from '../lib/exportUtils';
 
 const PREDEFINED_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Other'];
 
@@ -202,6 +205,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [hasCheckedMigration, setHasCheckedMigration] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // --- PERSISTENCE ---
   // Load data based on auth state
@@ -319,6 +324,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     return Object.entries(totals).sort((a, b) => b[1] - a[1]);
   }, [filteredExpenses]);
 
+  // Previous month expenses for comparison
+  const previousMonthExpenses = useMemo(() => {
+    const prevDate = new Date(viewDate);
+    prevDate.setMonth(prevDate.getMonth() - 1);
+    const prevMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    return expenses.filter(e => e.date.startsWith(prevMonthKey));
+  }, [expenses, viewDate]);
+
 
   // --- ACTIONS ---
 
@@ -370,6 +383,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     // Sync to cloud if authenticated
     if (!isGuest && user) {
       await DataSyncService.addExpense(newExpense, user.id);
+      setLastSyncTime(Date.now());
     }
 
     setExpenses(prev => [newExpense, ...prev]);
@@ -392,6 +406,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     // Sync deletion to cloud if authenticated
     if (!isGuest && user) {
       await DataSyncService.deleteExpense(id, user.id);
+      setLastSyncTime(Date.now());
     }
 
     // Remove expense and store for undo
@@ -449,6 +464,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     // Sync to cloud if authenticated
     if (!isGuest && user) {
       await DataSyncService.updateExpense(finalExpense, user.id);
+      setLastSyncTime(Date.now());
     }
 
     setExpenses(prev => prev.map(ex => {
@@ -469,6 +485,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const toggleBreakdown = useCallback(() => {
     setIsBreakdownOpen(prev => !prev);
   }, []);
+
+  // Export handlers
+  const handleExportCSV = useCallback(() => {
+    const filename = getExportFilename('expenses', 'csv');
+    exportToCSV(expenses, filename);
+    setIsExportMenuOpen(false);
+  }, [expenses]);
+
+  const handleExportJSON = useCallback(() => {
+    const filename = getExportFilename('expenses-backup', 'json');
+    exportToJSON(expenses, customCategories, budget, filename);
+    setIsExportMenuOpen(false);
+  }, [expenses, customCategories, budget]);
 
   // Handle hardware back button
   useEffect(() => {
@@ -632,6 +661,58 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           )}
         </div>
       )}
+
+      {/* Sync Status & Export */}
+      <div className="mb-8 flex items-center justify-between">
+        <SyncStatus isGuest={isGuest} lastSyncTime={lastSyncTime} />
+        
+        <div className="relative">
+          <button
+            onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Export
+          </button>
+
+          {isExportMenuOpen && (
+            <>
+              <div 
+                className="fixed inset-0 z-10" 
+                onClick={() => setIsExportMenuOpen(false)}
+              />
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20 overflow-hidden">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
+                >
+                  <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  <div>
+                    <div className="font-medium text-[#37352f] dark:text-gray-100">Export as CSV</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">For spreadsheets</div>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm border-t border-gray-100 dark:border-gray-700"
+                >
+                  <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
+                  </svg>
+                  <div>
+                    <div className="font-medium text-[#37352f] dark:text-gray-100">Export as JSON</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Full backup</div>
+                  </div>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Add Expense Form */}
       <div className="mb-12 border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm transition-all hover:shadow-md">
@@ -918,6 +999,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           {/* Category Distribution Donut Chart */}
           <DonutChartCategories
             expenses={filteredExpenses}
+            currency={currency}
+          />
+
+          {/* Quick Insights */}
+          <Insights
+            expenses={filteredExpenses}
+            previousMonthExpenses={previousMonthExpenses}
+            budget={budget}
             currency={currency}
           />
         </div>
