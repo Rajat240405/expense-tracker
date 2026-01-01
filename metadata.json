@@ -1,0 +1,5 @@
+{
+  "name": "Expenses",
+  "description": "A calm, minimal, distraction-free expense tracker inspired by Notion.",
+  "requestFramePermissions": []
+}
