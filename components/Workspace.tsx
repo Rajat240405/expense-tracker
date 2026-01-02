@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Expense } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataSyncService } from '../services/DataSyncService';
@@ -7,6 +7,11 @@ import MigrationModal from './MigrationModal';
 import LineChartMonthly from './charts/LineChartMonthly';
 import DonutChartCategories from './charts/DonutChartCategories';
 import BudgetProgress from './charts/BudgetProgress';
+import DatePickerModal from './pickers/DatePickerModal';
+import MonthPickerModal from './pickers/MonthPickerModal';
+import CategoryPickerModal from './pickers/CategoryPickerModal';
+import CurrencyPickerModal from './pickers/CurrencyPickerModal';
+import { format, parse } from 'date-fns';
 
 const PREDEFINED_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Other'];
 
@@ -23,115 +28,6 @@ const getCurrencySymbol = (code: string = 'USD'): string => {
   return CURRENCIES.find(c => c.code === code)?.symbol || '$';
 };
 
-// Category Selector Modal Component
-interface CategorySelectorProps {
-  isOpen: boolean;
-  selectedCategory: string;
-  categories: string[];
-  onSelect: (category: string) => void;
-  onClose: () => void;
-  onAddCustom: () => void;
-}
-
-const CategorySelector: React.FC<CategorySelectorProps> = memo(({ 
-  isOpen, 
-  selectedCategory, 
-  categories, 
-  onSelect, 
-  onClose,
-  onAddCustom 
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 z-40 animate-fadeIn"
-        onClick={onClose}
-      />
-      
-      {/* Bottom Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl animate-slideUp max-h-[80vh] overflow-hidden">
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-[#37352f] dark:text-gray-100">Select Category</h3>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 p-1"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div className="overflow-y-auto max-h-[calc(80vh-70px)] overscroll-contain">
-          <div className="p-4 space-y-1">
-            {categories.filter(c => c !== 'Other').map(cat => (
-              <button
-                key={cat}
-                onClick={() => {
-                  onSelect(cat);
-                  onClose();
-                }}
-                className={`
-                  w-full text-left px-4 py-3.5 rounded-lg transition-all
-                  ${selectedCategory === cat 
-                    ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium' 
-                    : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-600 text-[#37352f] dark:text-gray-100'
-                  }
-                `}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-base">{cat}</span>
-                  {selectedCategory === cat && (
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-                    </svg>
-                  )}
-                </div>
-              </button>
-            ))}
-            
-            {/* Add Custom Category */}
-            <button
-              onClick={() => {
-                onAddCustom();
-                onClose();
-              }}
-              className="w-full text-left px-4 py-3.5 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30 border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-400 dark:hover:border-purple-500 text-purple-700 dark:text-purple-300 font-medium transition-all"
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                <span>Add Custom Category</span>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-        .animate-slideUp {
-          animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-      `}</style>
-    </>
-  );
-});
-
 // App-level currency constant
 const CURRENCY_SYMBOL = '$';
 
@@ -139,14 +35,15 @@ interface WorkspaceProps {
   onBack?: () => void;
 }
 
-// Helper to format date for display (DD/MM/YYYY)
+// Helper to format date for display (dd MMM yyyy)
 const formatDateDisplay = (dateStr: string): string => {
-  // dateStr is in YYYY-MM-DD format from date input
-  const date = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  // dateStr is in YYYY-MM-DD format
+  try {
+    const date = parse(dateStr, 'yyyy-MM-dd', new Date());
+    return format(date, 'dd MMM yyyy');
+  } catch {
+    return dateStr;
+  }
 };
 
 // Helper to format date groups
@@ -185,6 +82,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const [customCategoryInput, setCustomCategoryInput] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [dateInput, setDateInput] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // Picker Modal States
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState<boolean>(false);
+  const [isCurrencyPickerOpen, setIsCurrencyPickerOpen] = useState<boolean>(false);
 
   // Breakdown Accordion State
   const [isBreakdownOpen, setIsBreakdownOpen] = useState<boolean>(true);
@@ -192,6 +94,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   // Inline Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
+  const [isEditCategorySelectorOpen, setIsEditCategorySelectorOpen] = useState<boolean>(false);
 
   // Undo Delete State
   const [deletedExpense, setDeletedExpense] = useState<Expense | null>(null);
@@ -303,13 +206,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     filteredExpenses.reduce((sum, ex) => sum + ex.amount, 0)
   , [filteredExpenses]);
 
-  // Today's total calculation
-  const todayTotal = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return expenses
-      .filter(e => e.date === today)
-      .reduce((sum, e) => sum + e.amount, 0);
-  }, [expenses]);
+  // Calculate total for each date group
+  const dateGroupTotals = useMemo(() => {
+    const totals: { [key: string]: number } = {};
+    Object.entries(groupedExpenses).forEach(([dateLabel, expenses]) => {
+      totals[dateLabel] = expenses.reduce((sum, e) => sum + e.amount, 0);
+    });
+    return totals;
+  }, [groupedExpenses]);
 
   const categoryTotals = useMemo(() => {
     const totals: { [key: string]: number } = {};
@@ -499,16 +403,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   return (
     <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 min-h-screen font-sans">
       
-      {/* Category Selector Modal */}
-      <CategorySelector
-        isOpen={isCategorySelectorOpen}
-        selectedCategory={category}
-        categories={allCategories}
-        onSelect={handleCategorySelect}
-        onClose={() => setIsCategorySelectorOpen(false)}
-        onAddCustom={handleAddCustomCategory}
-      />
-
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
         <div className="flex items-center justify-between w-full md:w-auto">
@@ -590,15 +484,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Previous month">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
             </button>
-            <select
-              value={viewDate.getMonth()}
-              onChange={(e) => handleMonthSelect(parseInt(e.target.value))}
-              className="text-sm font-semibold text-[#37352f] dark:text-gray-100 bg-transparent border-none outline-none cursor-pointer px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            <button
+              type="button"
+              onClick={() => setIsMonthPickerOpen(true)}
+              className="text-sm font-semibold text-[#37352f] dark:text-gray-100 bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
-              {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, idx) => (
-                <option key={month} value={idx} className="bg-white dark:bg-gray-800">{month} {viewDate.getFullYear()}</option>
-              ))}
-            </select>
+              {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </button>
             <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Next month">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
             </button>
@@ -641,13 +533,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {/* Date */}
             <div className="md:col-span-2">
               <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Date</label>
-              <input 
-                type="date"
-                required
-                value={dateInput}
-                onChange={(e) => setDateInput(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
-              />
+              <button
+                type="button"
+                onClick={() => setIsDatePickerOpen(true)}
+                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+              >
+                <span>{formatDateDisplay(dateInput)}</span>
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
             </div>
 
             {/* Amount */}
@@ -671,17 +566,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {/* Currency */}
             <div className="md:col-span-2">
               <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Currency</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors cursor-pointer"
+              <button
+                type="button"
+                onClick={() => setIsCurrencyPickerOpen(true)}
+                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
               >
-                {CURRENCIES.map(curr => (
-                  <option key={curr.code} value={curr.code} className="bg-white dark:bg-gray-900">
-                    {curr.symbol} {curr.name}
-                  </option>
-                ))}
-              </select>
+                <span>{getCurrencySymbol(currency)} {CURRENCIES.find(c => c.code === currency)?.name}</span>
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
             </div>
 
             {/* Category */}
@@ -758,9 +652,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             <div key={dateLabel}>
               <div className="flex items-center justify-between mb-3 ml-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{dateLabel}</h3>
-                {dateLabel === 'Today' && todayTotal > 0 && (
+                {dateGroupTotals[dateLabel] > 0 && (
                   <span className="text-sm font-bold text-[#37352f] dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700">
-                    ${todayTotal.toFixed(2)}
+                    {getCurrencySymbol(currency)}{dateGroupTotals[dateLabel].toFixed(2)}
                   </span>
                 )}
               </div>
@@ -772,37 +666,39 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                   >
                     {/* Inline Edit Mode */}
                     {editingId === expense.id ? (
-                      <div className="flex-1 grid grid-cols-12 gap-3 items-center">
-                        <div className="col-span-3 md:col-span-2">
-                           <input 
-                             type="number"
-                             value={editForm.amount}
-                             onChange={e => setEditForm(prev => ({...prev, amount: parseFloat(e.target.value)}))}
-                             className="w-full p-2 border border-blue-400 dark:border-blue-500 rounded text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100"
-                             autoFocus
-                             onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                           />
+                      <div className="flex-1 flex flex-col gap-3">
+                        <div className="flex gap-3 items-center">
+                          <div className="w-24">
+                            <input 
+                              type="number"
+                              value={editForm.amount}
+                              onChange={e => setEditForm(prev => ({...prev, amount: parseFloat(e.target.value)}))}
+                              className="w-full p-2.5 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 focus:outline-none"
+                              autoFocus
+                            />
+                          </div>
+                          <button
+                            onClick={() => setIsEditCategorySelectorOpen(true)}
+                            className="flex-1 p-2.5 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left font-medium flex items-center justify-between"
+                          >
+                            <span>{editForm.category}</span>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          <div className="flex gap-2">
+                            <button onClick={saveEdit} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors">Save</button>
+                            <button onClick={cancelEdit} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-sm px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">✕</button>
+                          </div>
                         </div>
-                        <div className="col-span-4 md:col-span-3">
-                           <select 
-                             value={editForm.category}
-                             onChange={e => setEditForm(prev => ({...prev, category: e.target.value}))}
-                             className="w-full p-2 border border-blue-400 dark:border-blue-500 rounded text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100"
-                           >
-                             {allCategories.filter(c => c !== 'Other').map(c => <option key={c} value={c} className="bg-white dark:bg-gray-900">{c}</option>)}
-                           </select>
-                        </div>
-                        <div className="col-span-5 md:col-span-7 flex gap-2">
-                           <input 
-                             type="text"
-                             value={editForm.note}
-                             onChange={e => setEditForm(prev => ({...prev, note: e.target.value}))}
-                             className="w-full p-2 border border-blue-400 dark:border-blue-500 rounded text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100"
-                             onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                           />
-                           <button onClick={saveEdit} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-xs font-medium px-2 whitespace-nowrap">Save</button>
-                           <button onClick={cancelEdit} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-xs px-1">✕</button>
-                        </div>
+                        <textarea 
+                          value={editForm.note || ''}
+                          onChange={e => setEditForm(prev => ({...prev, note: e.target.value}))}
+                          placeholder="Add a description..."
+                          className="w-full p-3 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 focus:outline-none resize-none leading-relaxed"
+                          rows={3}
+                          style={{ minHeight: '90px' }}
+                        />
                       </div>
                     ) : (
                       /* Display Mode */
@@ -978,6 +874,59 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           setHasCheckedMigration(true);
           setIsMigrationModalOpen(false);
         }}
+      />
+
+      {/* Custom Picker Modals */}
+      <DatePickerModal
+        isOpen={isDatePickerOpen}
+        selectedDate={dateInput}
+        onSelect={(date) => setDateInput(date)}
+        onClose={() => setIsDatePickerOpen(false)}
+        maxDate={new Date()}
+      />
+
+      <MonthPickerModal
+        isOpen={isMonthPickerOpen}
+        selectedMonth={viewDate.getMonth()}
+        selectedYear={viewDate.getFullYear()}
+        onSelect={(month, year) => {
+          setViewDate(new Date(year, month, 1));
+        }}
+        onClose={() => setIsMonthPickerOpen(false)}
+      />
+
+      <CategoryPickerModal
+        isOpen={isCategorySelectorOpen}
+        selectedCategory={category}
+        categories={allCategories}
+        onSelect={handleCategorySelect}
+        onClose={() => setIsCategorySelectorOpen(false)}
+        onAddCustom={handleAddCustomCategory}
+      />
+
+      {/* Category Picker for Edit Mode */}
+      <CategoryPickerModal
+        isOpen={isEditCategorySelectorOpen}
+        selectedCategory={editForm.category || ''}
+        categories={allCategories}
+        onSelect={(cat) => {
+          setEditForm(prev => ({...prev, category: cat}));
+          setIsEditCategorySelectorOpen(false);
+        }}
+        onClose={() => setIsEditCategorySelectorOpen(false)}
+        onAddCustom={() => {
+          // For edit mode, we'll just close and let them add via the add form
+          // Or we could enhance this to support adding custom categories in edit mode
+          setIsEditCategorySelectorOpen(false);
+        }}
+      />
+
+      <CurrencyPickerModal
+        isOpen={isCurrencyPickerOpen}
+        selectedCurrency={currency}
+        currencies={CURRENCIES}
+        onSelect={(code) => setCurrency(code)}
+        onClose={() => setIsCurrencyPickerOpen(false)}
       />
 
     </div>
