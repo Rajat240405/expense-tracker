@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Support all architectures
@@ -38,6 +38,17 @@ android {
             v2SigningEnabled true
         }
     }
+
+    buildTypes {
+        release {
+            // signingConfig signingConfigs.release // Disabled until keystore is set up
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+
+
 }
 
 repositories {
