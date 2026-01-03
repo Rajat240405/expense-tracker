@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import type { Expense } from '../../types';
 
@@ -8,14 +8,25 @@ interface DonutChartCategoriesProps {
 }
 
 const CATEGORY_COLORS: { [key: string]: string } = {
-  'Food': '#fb923c',
-  'Travel': '#34d399',
-  'Shopping': '#3b82f6',
-  'Bills': '#ef4444',
-  'Other': '#9ca3af'
+  'Food': '#fb923c',      // orange-400
+  'Travel': '#34d399',    // emerald-400
+  'Shopping': '#3b82f6',  // blue-500
+  'Bills': '#ef4444',     // red-500
+  'Other': '#9ca3af'      // gray-400
+};
+
+// Dark mode colors
+const CATEGORY_COLORS_DARK: { [key: string]: string } = {
+  'Food': '#fdba74',      // orange-300
+  'Travel': '#6ee7b7',    // emerald-300
+  'Shopping': '#60a5fa',  // blue-400
+  'Bills': '#f87171',     // red-400
+  'Other': '#d1d5db'      // gray-300
 };
 
 const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, currency }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
   const chartData = useMemo(() => {
     const categoryTotals: { [key: string]: number } = {};
     
@@ -55,7 +66,10 @@ const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, c
   };
 
   const getColor = (category: string): string => {
-    return CATEGORY_COLORS[category] || '#6b7280';
+    // Detect dark mode
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const colors = isDark ? CATEGORY_COLORS_DARK : CATEGORY_COLORS;
+    return colors[category] || (isDark ? '#d1d5db' : '#9ca3af');
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -81,10 +95,31 @@ const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, c
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-4">
-        Category Distribution
-      </h3>
-      <div className="flex flex-col md:flex-row items-center gap-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between mb-4 text-left hover:opacity-70 transition-opacity"
+      >
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Category Distribution
+        </h3>
+        <svg 
+          className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      <div 
+        className="transition-all duration-300 ease-in-out overflow-hidden"
+        style={{
+          maxHeight: isExpanded ? '500px' : '0',
+          opacity: isExpanded ? 1 : 0,
+        }}
+      >
+        <div className="flex flex-col md:flex-row items-center gap-4">
         <div className="w-full md:w-1/2">
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
@@ -121,6 +156,7 @@ const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, c
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { Expense } from '../../types';
 
@@ -8,6 +8,8 @@ interface LineChartMonthlyProps {
 }
 
 const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
   const chartData = useMemo(() => {
     // Group expenses by day
     const dailyTotals: { [day: string]: number } = {};
@@ -67,12 +69,33 @@ const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency 
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-4">
-        Daily Spending Trend
-      </h3>
-      <ResponsiveContainer width="100%" height={200}>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between mb-4 text-left hover:opacity-70 transition-opacity"
+      >
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Daily Spending Trend
+        </h3>
+        <svg 
+          className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div 
+        className="transition-all duration-300 ease-in-out overflow-hidden"
+        style={{
+          maxHeight: isExpanded ? '300px' : '0',
+          opacity: isExpanded ? 1 : 0,
+        }}
+      >
+        <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis 
             dataKey="day" 
             stroke="#9ca3af" 
@@ -91,10 +114,11 @@ const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency 
             stroke="#2383e2" 
             strokeWidth={2}
             dot={{ fill: '#2383e2', r: 3 }}
-            activeDot={{ r: 5 }}
+            activeDot={{ r: 5, fill: '#2383e2' }}
           />
         </LineChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 };

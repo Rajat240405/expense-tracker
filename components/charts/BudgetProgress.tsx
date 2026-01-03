@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 
 interface BudgetProgressProps {
   budget: number;
@@ -7,6 +7,8 @@ interface BudgetProgressProps {
 }
 
 const BudgetProgress: React.FC<BudgetProgressProps> = ({ budget, spent, currency }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
   const percentage = useMemo(() => {
     if (budget <= 0) return 0;
     return Math.min((spent / budget) * 100, 100);
@@ -41,10 +43,31 @@ const BudgetProgress: React.FC<BudgetProgressProps> = ({ budget, spent, currency
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-4">
-        Budget Status
-      </h3>
-      <div className="flex flex-col md:flex-row items-center justify-around gap-6">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between mb-4 text-left hover:opacity-70 transition-opacity"
+      >
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Budget Status
+        </h3>
+        <svg 
+          className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div 
+        className="transition-all duration-300 ease-in-out overflow-hidden"
+        style={{
+          maxHeight: isExpanded ? '400px' : '0',
+          opacity: isExpanded ? 1 : 0,
+        }}
+      >
+        <div className="flex flex-col md:flex-row items-center justify-around gap-6">
         {/* Circular Progress */}
         <div className="relative w-44 h-44 flex items-center justify-center">
           <svg className="w-44 h-44 transform -rotate-90">
@@ -109,6 +132,7 @@ const BudgetProgress: React.FC<BudgetProgressProps> = ({ budget, spent, currency
             </p>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
