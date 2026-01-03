@@ -10,6 +10,11 @@ interface LineChartMonthlyProps {
 const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
+  // Explicit colors for Android APK compatibility
+  const CHART_COLOR = '#2383E2'; // blue-600
+  const GRID_COLOR = '#E5E7EB'; // gray-200
+  const AXIS_COLOR = '#9CA3AF'; // gray-400
+
   const chartData = useMemo(() => {
     // Group expenses by day
     const dailyTotals: { [day: string]: number } = {};
@@ -95,15 +100,15 @@ const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency 
       >
         <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
           <XAxis 
             dataKey="day" 
-            stroke="#9ca3af" 
+            stroke={AXIS_COLOR} 
             style={{ fontSize: '12px' }}
             tickFormatter={(value) => value}
           />
           <YAxis 
-            stroke="#9ca3af" 
+            stroke={AXIS_COLOR} 
             style={{ fontSize: '12px' }}
             tickFormatter={(value) => `${getCurrencySymbol(currency)}${value}`}
           />
@@ -111,10 +116,10 @@ const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency 
           <Line 
             type="monotone" 
             dataKey="amount" 
-            stroke="#2383e2" 
+            stroke={CHART_COLOR} 
             strokeWidth={2}
-            dot={{ fill: '#2383e2', r: 3 }}
-            activeDot={{ r: 5, fill: '#2383e2' }}
+            dot={{ fill: CHART_COLOR, r: 3 }}
+            activeDot={{ r: 5, fill: CHART_COLOR }}
           />
         </LineChart>
       </ResponsiveContainer>

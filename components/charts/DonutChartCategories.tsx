@@ -7,22 +7,33 @@ interface DonutChartCategoriesProps {
   currency: string;
 }
 
+// Explicit HEX colors for Android APK compatibility
 const CATEGORY_COLORS: { [key: string]: string } = {
-  'Food': '#fb923c',      // orange-400
-  'Travel': '#34d399',    // emerald-400
-  'Shopping': '#3b82f6',  // blue-500
-  'Bills': '#ef4444',     // red-500
-  'Other': '#9ca3af'      // gray-400
+  'Food': '#FB923C',
+  'Travel': '#34D399',
+  'Shopping': '#3B82F6',
+  'Bills': '#EF4444',
+  'Other': '#9CA3AF'
 };
 
-// Dark mode colors
+// Dark mode colors - explicit HEX
 const CATEGORY_COLORS_DARK: { [key: string]: string } = {
-  'Food': '#fdba74',      // orange-300
-  'Travel': '#6ee7b7',    // emerald-300
-  'Shopping': '#60a5fa',  // blue-400
-  'Bills': '#f87171',     // red-400
-  'Other': '#d1d5db'      // gray-300
+  'Food': '#FDBA74',
+  'Travel': '#6EE7B7',
+  'Shopping': '#60A5FA',
+  'Bills': '#F87171',
+  'Other': '#D1D5DB'
 };
+
+// Fallback color palette for custom categories
+const FALLBACK_COLORS = [
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#06B6D4', // cyan
+  '#6366F1', // indigo
+];
 
 const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, currency }) => {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -69,7 +80,15 @@ const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, c
     // Detect dark mode
     const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const colors = isDark ? CATEGORY_COLORS_DARK : CATEGORY_COLORS;
-    return colors[category] || (isDark ? '#d1d5db' : '#9ca3af');
+    
+    // Return predefined color or use fallback palette for custom categories
+    if (colors[category]) {
+      return colors[category];
+    }
+    
+    // Generate consistent color for custom categories
+    const hash = category.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return FALLBACK_COLORS[hash % FALLBACK_COLORS.length];
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
