@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Expense } from '../types';
+import { Expense, CustomCurrency, WorkspaceView } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataSyncService } from '../services/DataSyncService';
 import AuthModal from './AuthModal';
 import MigrationModal from './MigrationModal';
+import Splits from './Splits';
 import LineChartMonthly from './charts/LineChartMonthly';
 import DonutChartCategories from './charts/DonutChartCategories';
 import BudgetProgress from './charts/BudgetProgress';
@@ -23,8 +24,13 @@ const CURRENCIES = [
   { code: 'GBP', symbol: '£', name: 'Pound' },
 ];
 
-// Helper to get currency symbol
-const getCurrencySymbol = (code: string = 'USD'): string => {
+// Helper to get currency symbol - supports custom currencies
+const getCurrencySymbol = (code: string = 'USD', customCurrencies: CustomCurrency[] = []): string => {
+  // Check custom currencies first
+  const custom = customCurrencies.find(c => c.code === code);
+  if (custom) return custom.symbol;
+  
+  // Then check standard currencies
   return CURRENCIES.find(c => c.code === code)?.symbol || '$';
 };
 
@@ -68,10 +74,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   // --- STATE ---
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [customCurrencies, setCustomCurrencies] = useState<CustomCurrency[]>([]);
   const [budget, setBudget] = useState<number>(0);
   
   // View State
   const [viewDate, setViewDate] = useState(new Date()); // For tracking current month view
+  const [activeView, setActiveView] = useState<WorkspaceView>('expenses');
   
   // Add Form State
   const [amount, setAmount] = useState<string>('');
@@ -147,12 +155,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       // Load categories and budget (always from localStorage for now)
       const savedCats = localStorage.getItem('custom_categories_v1');
       const savedBudget = localStorage.getItem('budget_v1');
+      const savedCustomCurrencies = localStorage.getItem('custom_currencies_v1');
       
       if (savedCats) {
         try { setCustomCategories(JSON.parse(savedCats)); } catch (e) {}
       }
       if (savedBudget) {
         try { setBudget(parseFloat(savedBudget)); } catch (e) {}
+      }
+      if (savedCustomCurrencies) {
+        try { setCustomCurrencies(JSON.parse(savedCustomCurrencies)); } catch (e) {}
       }
     };
 
@@ -173,6 +185,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   useEffect(() => {
     localStorage.setItem('budget_v1', budget.toString());
   }, [budget]);
+
+  useEffect(() => {
+    localStorage.setItem('custom_currencies_v1', JSON.stringify(customCurrencies));
+  }, [customCurrencies]);
 
 
   // --- COMPUTED ---
@@ -202,26 +218,48 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     return groups;
   }, [filteredExpenses]);
 
+  // Multi-currency totals - grouped by currency
+  const totalsByCurrency = useMemo(() => {
+    const totals: { [currency: string]: number } = {};
+    filteredExpenses.forEach(ex => {
+      const curr = ex.currency || currency;
+      totals[curr] = (totals[curr] || 0) + ex.amount;
+    });
+    return totals;
+  }, [filteredExpenses, currency]);
+
+  // Legacy single total (for budget comparison if same currency)
   const total = useMemo(() => 
     filteredExpenses.reduce((sum, ex) => sum + ex.amount, 0)
   , [filteredExpenses]);
 
-  // Calculate total for each date group
-  const dateGroupTotals = useMemo(() => {
-    const totals: { [key: string]: number } = {};
+  // Calculate total for each date group - per currency
+  const dateGroupTotalsByCurrency = useMemo(() => {
+    const totals: { [dateLabel: string]: { [currency: string]: number } } = {};
     Object.entries(groupedExpenses).forEach(([dateLabel, expenses]) => {
-      totals[dateLabel] = expenses.reduce((sum, e) => sum + e.amount, 0);
+      totals[dateLabel] = {};
+      expenses.forEach(e => {
+        const curr = e.currency || currency;
+        totals[dateLabel][curr] = (totals[dateLabel][curr] || 0) + e.amount;
+      });
     });
     return totals;
-  }, [groupedExpenses]);
+  }, [groupedExpenses, currency]);
 
-  const categoryTotals = useMemo(() => {
-    const totals: { [key: string]: number } = {};
+  const categoryTotalsByCurrency = useMemo(() => {
+    const totals: { [category: string]: { [currency: string]: number } } = {};
     filteredExpenses.forEach(e => {
-      totals[e.category] = (totals[e.category] || 0) + e.amount;
+      const curr = e.currency || currency;
+      if (!totals[e.category]) totals[e.category] = {};
+      totals[e.category][curr] = (totals[e.category][curr] || 0) + e.amount;
     });
-    return Object.entries(totals).sort((a, b) => b[1] - a[1]);
-  }, [filteredExpenses]);
+    // Sort by total amount across all currencies
+    return Object.entries(totals).sort((a, b) => {
+      const sumA = Object.values(a[1]).reduce((s, v) => s + v, 0);
+      const sumB = Object.values(b[1]).reduce((s, v) => s + v, 0);
+      return sumB - sumA;
+    });
+  }, [filteredExpenses, currency]);
 
 
   // --- ACTIONS ---
@@ -525,6 +563,48 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         </div>
       )}
 
+      {/* View Navigation Tabs */}
+      <div className="mb-8 flex gap-2 border-b border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => setActiveView('expenses')}
+          className={`px-4 py-3 text-sm font-semibold transition-all ${
+            activeView === 'expenses'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Expenses
+          </div>
+        </button>
+        <button
+          onClick={() => setActiveView('splits')}
+          className={`px-4 py-3 text-sm font-semibold transition-all ${
+            activeView === 'splits'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Splits
+          </div>
+        </button>
+      </div>
+
+      {/* Conditional View Rendering */}
+      {activeView === 'splits' ? (
+        <Splits
+          customCurrencies={customCurrencies}
+          getCurrencySymbol={(code) => getCurrencySymbol(code, customCurrencies)}
+        />
+      ) : (
+        <>
       {/* Add Expense Form */}
       <div className="mb-12 border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm transition-all hover:shadow-md">
         <form onSubmit={addExpense} className="flex flex-col gap-5">
@@ -548,8 +628,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {/* Amount */}
             <div className="md:col-span-2">
               <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Amount</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm font-medium">{getCurrencySymbol(currency)}</span>
+              <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded hover:border-gray-300 dark:hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
+                <span className="pl-3 text-gray-500 dark:text-gray-400 text-sm font-medium">{getCurrencySymbol(currency, customCurrencies)}</span>
                 <input
                   type="number"
                   required
@@ -558,7 +638,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                   placeholder="0.00"
                   step="0.01"
                   min="0"
-                  className="w-full pl-7 pr-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm font-medium text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-colors"
+                  className="flex-1 px-2 py-2.5 bg-transparent border-0 text-sm font-medium text-[#37352f] dark:text-gray-100 outline-none placeholder-gray-300 dark:placeholder-gray-600"
                 />
               </div>
             </div>
@@ -571,7 +651,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 onClick={() => setIsCurrencyPickerOpen(true)}
                 className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
               >
-                <span>{getCurrencySymbol(currency)} {CURRENCIES.find(c => c.code === currency)?.name}</span>
+                <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
                 <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
                 </svg>
@@ -652,10 +732,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             <div key={dateLabel}>
               <div className="flex items-center justify-between mb-3 ml-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{dateLabel}</h3>
-                {dateGroupTotals[dateLabel] > 0 && (
-                  <span className="text-sm font-bold text-[#37352f] dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700">
-                    {getCurrencySymbol(currency)}{dateGroupTotals[dateLabel].toFixed(2)}
-                  </span>
+                {dateGroupTotalsByCurrency[dateLabel] && Object.keys(dateGroupTotalsByCurrency[dateLabel]).length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {Object.entries(dateGroupTotalsByCurrency[dateLabel]).map(([curr, amount]) => (
+                      <span key={curr} className="text-sm font-bold text-[#37352f] dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700">
+                        {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
               <div className="space-y-1">
@@ -718,7 +802,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                            <span className="text-base font-semibold text-[#37352f] dark:text-gray-100 font-mono">
-                             {getCurrencySymbol(expense.currency)}{expense.amount.toFixed(2)}
+                             {getCurrencySymbol(expense.currency || currency, customCurrencies)}{expense.amount.toFixed(2)}
                            </span>
                            <button
                             onClick={() => startEditing(expense)}
@@ -773,20 +857,36 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
              }`}
            >
              <div className="space-y-3">
-               {categoryTotals.map(([cat, amount]) => (
+               {categoryTotalsByCurrency.map(([cat, currencyAmounts]) => (
                  <div 
                    key={cat} 
-                   className="flex items-center justify-between py-2.5 px-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                   className="py-2.5 px-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                  >
-                   <span className="text-sm text-gray-600 dark:text-gray-300">{cat}</span>
-                   <span className="text-sm font-medium text-[#37352f] dark:text-gray-100">${amount.toFixed(2)}</span>
+                   <div className="flex items-center justify-between mb-1">
+                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cat}</span>
+                   </div>
+                   <div className="flex flex-wrap gap-2">
+                     {Object.entries(currencyAmounts).map(([curr, amount]) => (
+                       <span key={curr} className="text-sm text-[#37352f] dark:text-gray-100 font-mono">
+                         {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                       </span>
+                     ))}
+                   </div>
                  </div>
                ))}
                
-               {/* Total Row */}
-               <div className="flex items-center justify-between py-3 px-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border-t-2 border-blue-200 dark:border-blue-700 mt-2">
-                 <span className="text-sm font-bold text-blue-900 dark:text-blue-300">Total</span>
-                 <span className="text-base font-bold text-blue-900 dark:text-blue-300">${total.toFixed(2)}</span>
+               {/* Total Row - Multi-Currency */}
+               <div className="py-3 px-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border-t-2 border-blue-200 dark:border-blue-700 mt-2">
+                 <div className="flex items-center justify-between mb-2">
+                   <span className="text-sm font-bold text-blue-900 dark:text-blue-300">Total</span>
+                 </div>
+                 <div className="flex flex-wrap gap-3">
+                   {Object.entries(totalsByCurrency).map(([curr, amount]) => (
+                     <span key={curr} className="text-base font-bold text-blue-900 dark:text-blue-300 font-mono">
+                       {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                     </span>
+                   ))}
+                 </div>
                </div>
              </div>
            </div>
@@ -817,6 +917,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             currency={currency}
           />
         </div>
+      )}
+      </>
       )}
 
       {/* Undo Delete Snackbar */}
@@ -925,7 +1027,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         isOpen={isCurrencyPickerOpen}
         selectedCurrency={currency}
         currencies={CURRENCIES}
+        customCurrencies={customCurrencies}
         onSelect={(code) => setCurrency(code)}
+        onAddCustom={(newCurrency) => {
+          setCustomCurrencies(prev => [...prev, newCurrency]);
+        }}
         onClose={() => setIsCurrencyPickerOpen(false)}
       />
 

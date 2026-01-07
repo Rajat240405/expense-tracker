@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Daily Kharcha",
-  "short_name": "Kharcha",
+  "name": "Expenses",
+  "short_name": "Expenses",
   "description": "A simple daily expense tracker",
   "lang": "en",
   "dir": "ltr",
