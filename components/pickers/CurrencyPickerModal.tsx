@@ -6,13 +6,16 @@ interface Currency {
   symbol: string;
   name: string;
   region?: string;
+  isCustom?: boolean;
 }
 
 interface CurrencyPickerModalProps {
   isOpen: boolean;
   selectedCurrency: string;
   currencies: Currency[];
+  customCurrencies?: Currency[];
   onSelect: (currencyCode: string) => void;
+  onAddCustom: (currency: Currency) => void;
   onClose: () => void;
 }
 
@@ -69,11 +72,16 @@ const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
   isOpen,
   selectedCurrency,
   currencies,
+  customCurrencies = [],
   onSelect,
+  onAddCustom,
   onClose,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'default' | 'all'>('default');
+  const [viewMode, setViewMode] = useState<'default' | 'all' | 'custom'>('default');
+  const [customName, setCustomName] = useState('');
+  const [customSymbol, setCustomSymbol] = useState('');
+  const [customCode, setCustomCode] = useState('');
 
   const handleSelect = (currencyCode: string) => {
     onSelect(currencyCode);
@@ -82,9 +90,37 @@ const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
     onClose();
   };
 
+  const handleAddCustom = () => {
+    if (!customName.trim() || !customSymbol.trim()) {
+      alert('Please enter both currency name and symbol');
+      return;
+    }
+    
+    const code = customCode.trim() || customName.trim().toUpperCase().replace(/\s+/g, '_').substring(0, 10);
+    
+    onAddCustom({
+      code,
+      symbol: customSymbol.trim(),
+      name: customName.trim(),
+      isCustom: true,
+    });
+    
+    // Reset form
+    setCustomName('');
+    setCustomSymbol('');
+    setCustomCode('');
+    setViewMode('default');
+    onSelect(code);
+    onClose();
+  };
+
+  const allAvailableCurrencies = [...currencies, ...customCurrencies];
+
   const currenciesToShow = viewMode === 'all' 
     ? ALL_CURRENCIES 
-    : currencies;
+    : viewMode === 'custom'
+    ? customCurrencies
+    : allAvailableCurrencies;
 
   const filteredCurrencies = currenciesToShow.filter(curr => 
     curr.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -155,15 +191,24 @@ const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
                 
                 {/* View Mode Toggle */}
                 {viewMode === 'default' && (
-                  <div className="px-6 pb-4">
+                  <div className="px-6 pb-4 space-y-2">
                     <button
                       onClick={() => setViewMode('all')}
                       className="w-full px-4 py-2.5 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg text-sm font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                       </svg>
                       Browse All {ALL_CURRENCIES.length} Currencies
+                    </button>
+                    <button
+                      onClick={() => setViewMode('custom')}
+                      className="w-full px-4 py-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm font-medium text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Add Custom Currency
                     </button>
                   </div>
                 )}
@@ -185,7 +230,97 @@ const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
 
               {/* Content - Grid Layout for All Currencies */}
               <div className="overflow-y-auto max-h-[calc(80vh-200px)] overscroll-contain">
-                {filteredCurrencies.length === 0 ? (
+                {viewMode === 'custom' ? (
+                  // Custom Currency Form
+                  <div className="p-6 space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-300">
+                        Create your own currency symbol for tracking expenses in any format you need.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Currency Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        placeholder="e.g. Canadian Dollar, Bitcoin"
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Currency Symbol *
+                      </label>
+                      <input
+                        type="text"
+                        value={customSymbol}
+                        onChange={(e) => setCustomSymbol(e.target.value)}
+                        placeholder="e.g. C$, ₿, Kr"
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        maxLength={5}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Currency Code (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={customCode}
+                        onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. CAD, BTC (auto-generated if empty)"
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        maxLength={10}
+                      />
+                    </div>
+                    
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        onClick={() => setViewMode('default')}
+                        className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleAddCustom}
+                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!customName.trim() || !customSymbol.trim()}
+                      >
+                        Add Currency
+                      </button>
+                    </div>
+                    
+                    {customCurrencies.length > 0 && (
+                      <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Your Custom Currencies</h3>
+                        <div className="space-y-2">
+                          {customCurrencies.map(curr => (
+                            <button
+                              key={curr.code}
+                              onClick={() => handleSelect(curr.code)}
+                              className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-xl font-semibold w-8">{curr.symbol}</span>
+                                <div>
+                                  <div className="text-sm font-medium text-[#37352f] dark:text-gray-100">{curr.name}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">{curr.code}</div>
+                                </div>
+                              </div>
+                              <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded">Custom</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : filteredCurrencies.length === 0 ? (
                   <div className="px-6 py-12 text-center">
                     <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
