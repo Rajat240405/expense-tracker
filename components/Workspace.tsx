@@ -70,6 +70,11 @@ const getDateLabel = (dateStr: string) => {
   return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 };
 
+// Helper to check if date should be auto-collapsed
+const shouldAutoCollapse = (dateLabel: string): boolean => {
+  return dateLabel !== 'Today' && dateLabel !== 'Yesterday';
+};
+
 const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   // --- STATE ---
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -98,6 +103,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
   // Breakdown Accordion State
   const [isBreakdownOpen, setIsBreakdownOpen] = useState<boolean>(true);
+
+  // Collapsible Date Groups State
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
 
   // Inline Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -260,6 +268,29 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       return sumB - sumA;
     });
   }, [filteredExpenses, currency]);
+
+  // Auto-collapse older dates on initial load and month change
+  useEffect(() => {
+    const datesToCollapse = new Set<string>();
+    Object.keys(groupedExpenses).forEach(dateLabel => {
+      if (shouldAutoCollapse(dateLabel)) {
+        datesToCollapse.add(dateLabel);
+      }
+    });
+    setCollapsedDates(datesToCollapse);
+  }, [currentMonthKey]); // Only run when month changes
+
+  const toggleDateGroup = useCallback((dateLabel: string) => {
+    setCollapsedDates(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(dateLabel)) {
+        newSet.delete(dateLabel);
+      } else {
+        newSet.add(dateLabel);
+      }
+      return newSet;
+    });
+  }, []);
 
 
   // --- ACTIONS ---
@@ -728,10 +759,30 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             </div>
           </div>
         ) : (
-          Object.keys(groupedExpenses).map(dateLabel => (
+          Object.keys(groupedExpenses).map(dateLabel => {
+            const isCollapsed = collapsedDates.has(dateLabel);
+            const expenseCount = groupedExpenses[dateLabel].length;
+            
+            return (
             <div key={dateLabel}>
-              <div className="flex items-center justify-between mb-3 ml-1">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{dateLabel}</h3>
+              <button
+                onClick={() => toggleDateGroup(dateLabel)}
+                className="w-full flex items-center justify-between mb-3 ml-1 group hover:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center gap-2">
+                  <svg 
+                    className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {dateLabel}
+                    {isCollapsed && <span className="ml-2 text-gray-400 dark:text-gray-600">({expenseCount})</span>}
+                  </h3>
+                </div>
                 {dateGroupTotalsByCurrency[dateLabel] && Object.keys(dateGroupTotalsByCurrency[dateLabel]).length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     {Object.entries(dateGroupTotalsByCurrency[dateLabel]).map(([curr, amount]) => (
@@ -741,7 +792,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                     ))}
                   </div>
                 )}
-              </div>
+              </button>
+              {!isCollapsed && (
               <div className="space-y-1">
                 {groupedExpenses[dateLabel].map(expense => (
                   <div 
@@ -795,7 +847,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                              {expense.category}
                            </span>
                            <div className="flex-1 min-w-0">
-                             <span className="block text-base text-[#37352f] dark:text-gray-100 break-words">
+                             <span className="block text-base text-[#37352f] dark:text-gray-100 line-clamp-1 break-words">
                                {expense.note || <span className="text-gray-300 dark:text-gray-600 italic text-sm">No note</span>}
                              </span>
                            </div>
@@ -824,8 +876,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                   </div>
                 ))}
               </div>
+              )}
             </div>
-          ))
+          );
+          })
         )}
       </div>
 
