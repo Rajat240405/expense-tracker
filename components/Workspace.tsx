@@ -62,12 +62,15 @@ const getDateLabel = (dateStr: string) => {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   
   const diffTime = t.getTime() - d.getTime();
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
+  if (diffDays >= 2 && diffDays <= 7) return 'This Week';
+  if (diffDays >= 8 && diffDays <= 14) return 'Last Week';
   
-  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  // For older dates, group by month
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };
 
 // Helper to check if date should be auto-collapsed
@@ -198,6 +201,24 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     localStorage.setItem('custom_currencies_v1', JSON.stringify(customCurrencies));
   }, [customCurrencies]);
 
+  // Load collapsed dates from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('collapsed_dates_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCollapsedDates(new Set(parsed));
+      } catch (e) {
+        console.error('Failed to load collapsed dates:', e);
+      }
+    }
+  }, []);
+
+  // Save collapsed dates to localStorage
+  useEffect(() => {
+    localStorage.setItem('collapsed_dates_v1', JSON.stringify(Array.from(collapsedDates)));
+  }, [collapsedDates]);
+
 
   // --- COMPUTED ---
   const allCategories = useMemo(() => {
@@ -223,7 +244,32 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       if (!groups[label]) groups[label] = [];
       groups[label].push(e);
     });
-    return groups;
+    
+    // Sort groups by priority order
+    const groupOrder = ['Today', 'Yesterday', 'This Week', 'Last Week'];
+    const sortedGroups: { [key: string]: Expense[] } = {};
+    
+    // First add priority groups
+    groupOrder.forEach(key => {
+      if (groups[key]) {
+        sortedGroups[key] = groups[key];
+      }
+    });
+    
+    // Then add month groups (sorted by most recent first)
+    Object.keys(groups)
+      .filter(key => !groupOrder.includes(key))
+      .sort((a, b) => {
+        // Sort months by date (most recent first)
+        const dateA = new Date(a + ' 1');
+        const dateB = new Date(b + ' 1');
+        return dateB.getTime() - dateA.getTime();
+      })
+      .forEach(key => {
+        sortedGroups[key] = groups[key];
+      });
+    
+    return sortedGroups;
   }, [filteredExpenses]);
 
   // Multi-currency totals - grouped by currency
@@ -269,16 +315,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     });
   }, [filteredExpenses, currency]);
 
-  // Auto-collapse older dates on initial load and month change
+  // Auto-collapse older dates on month change (merge with existing state)
   useEffect(() => {
-    const datesToCollapse = new Set<string>();
-    Object.keys(groupedExpenses).forEach(dateLabel => {
-      if (shouldAutoCollapse(dateLabel)) {
-        datesToCollapse.add(dateLabel);
-      }
+    setCollapsedDates(prev => {
+      const newSet = new Set(prev);
+      Object.keys(groupedExpenses).forEach(dateLabel => {
+        if (shouldAutoCollapse(dateLabel) && !prev.has(dateLabel)) {
+          // Only auto-collapse if user hasn't manually expanded it
+          const wasManuallyExpanded = localStorage.getItem(`date_expanded_${dateLabel}`);
+          if (!wasManuallyExpanded) {
+            newSet.add(dateLabel);
+          }
+        }
+      });
+      return newSet;
     });
-    setCollapsedDates(datesToCollapse);
-  }, [currentMonthKey]); // Only run when month changes
+  }, [currentMonthKey, groupedExpenses]); // Run when month changes or expenses change
 
   const toggleDateGroup = useCallback((dateLabel: string) => {
     setCollapsedDates(prev => {
