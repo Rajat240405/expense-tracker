@@ -16,18 +16,21 @@ const LineChartMonthly: React.FC<LineChartMonthlyProps> = ({ expenses, currency 
   const AXIS_COLOR = '#9CA3AF'; // gray-400
 
   const chartData = useMemo(() => {
+    // CRITICAL: Only include expenses matching the selected currency to prevent mixing currencies
+    const filteredByCurrency = expenses.filter(e => (e.currency || 'INR') === currency);
+    
     // Group expenses by day
     const dailyTotals: { [day: string]: number } = {};
     
-    expenses.forEach(expense => {
+    filteredByCurrency.forEach(expense => {
       const day = new Date(expense.date).getDate();
       const dayKey = day.toString();
       dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + expense.amount;
     });
 
     // Create array for all days in month
-    const daysInMonth = expenses.length > 0 
-      ? new Date(new Date(expenses[0].date).getFullYear(), new Date(expenses[0].date).getMonth() + 1, 0).getDate()
+    const daysInMonth = filteredByCurrency.length > 0 
+      ? new Date(new Date(filteredByCurrency[0].date).getFullYear(), new Date(filteredByCurrency[0].date).getMonth() + 1, 0).getDate()
       : 31;
 
     const data = [];

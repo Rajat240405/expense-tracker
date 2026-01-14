@@ -1,6 +1,17 @@
 import React, { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { Split } from '../types';
+import { Split, CustomCurrency } from '../types';
+import { format, parse } from 'date-fns';
+import DatePickerModal from './pickers/DatePickerModal';
+import CurrencyPickerModal from './pickers/CurrencyPickerModal';
+
+// Currency options
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'Dollar' },
+  { code: 'INR', symbol: '₹', name: 'Rupees' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'Pound' },
+];
 
 interface AddSplitModalProps {
   isOpen: boolean;
@@ -8,6 +19,8 @@ interface AddSplitModalProps {
   onAdd: (split: Omit<Split, 'id' | 'timestamp' | 'settled'>) => void;
   defaultCurrency: string;
   getCurrencySymbol: (code: string) => string;
+  customCurrencies: CustomCurrency[];
+  onAddCustomCurrency?: (currency: CustomCurrency) => void;
 }
 
 const AddSplitModal: React.FC<AddSplitModalProps> = ({
@@ -16,6 +29,8 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
   onAdd,
   defaultCurrency,
   getCurrencySymbol,
+  customCurrencies,
+  onAddCustomCurrency,
 }) => {
   const [personName, setPersonName] = useState('');
   const [amount, setAmount] = useState('');
@@ -23,6 +38,9 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [direction, setDirection] = useState<'to_receive' | 'to_pay'>('to_receive');
+  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isCurrencyPickerOpen, setIsCurrencyPickerOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +54,7 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
       category: category.trim() || undefined,
       note: note.trim() || undefined,
       direction,
-      date: new Date().toISOString().split('T')[0],
+      date,
     });
 
     // Reset form
@@ -46,6 +64,7 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
     setCategory('');
     setNote('');
     setDirection('to_receive');
+    setDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
 
@@ -56,6 +75,7 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
     setCategory('');
     setNote('');
     setDirection('to_receive');
+    setDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
 
@@ -176,16 +196,16 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Currency
                     </label>
-                    <select
-                      value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
-                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    <button
+                      type="button"
+                      onClick={() => setIsCurrencyPickerOpen(true)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     >
-                      <option value="INR">₹ INR</option>
-                      <option value="USD">$ USD</option>
-                      <option value="EUR">€ EUR</option>
-                      <option value="GBP">£ GBP</option>
-                    </select>
+                      <span>{getCurrencySymbol(currency)} {currency}</span>
+                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
@@ -201,6 +221,23 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
                     placeholder="e.g. Dinner, Groceries, Rent"
                     className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Date
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(true)}
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-base text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  >
+                    <span>{format(parse(date, 'yyyy-MM-dd', new Date()), 'dd MMM yyyy')}</span>
+                    <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </button>
                 </div>
 
                 {/* Note (Optional) */}
@@ -230,6 +267,26 @@ const AddSplitModal: React.FC<AddSplitModalProps> = ({
           </div>
         </Transition.Child>
       </Dialog>
+
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        isOpen={isDatePickerOpen}
+        selectedDate={date}
+        onSelect={(newDate) => setDate(newDate)}
+        onClose={() => setIsDatePickerOpen(false)}
+        maxDate={new Date()}
+      />
+
+      {/* Currency Picker Modal */}
+      <CurrencyPickerModal
+        isOpen={isCurrencyPickerOpen}
+        selectedCurrency={currency}
+        currencies={CURRENCIES}
+        customCurrencies={customCurrencies}
+        onSelect={(newCurrency) => setCurrency(newCurrency)}
+        onAddCustom={onAddCustomCurrency}
+        onClose={() => setIsCurrencyPickerOpen(false)}
+      />
     </Transition>
   );
 };
