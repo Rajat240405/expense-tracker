@@ -39,9 +39,12 @@ const DonutChartCategories: React.FC<DonutChartCategoriesProps> = ({ expenses, c
   const [isExpanded, setIsExpanded] = useState(true);
 
   const chartData = useMemo(() => {
+    // CRITICAL: Only include expenses matching the selected currency to prevent mixing currencies
+    const filteredByCurrency = expenses.filter(e => (e.currency || 'INR') === currency);
+    
     const categoryTotals: { [key: string]: number } = {};
     
-    expenses.forEach(expense => {
+    filteredByCurrency.forEach(expense => {
       categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
     });
 
