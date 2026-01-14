@@ -324,13 +324,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       if (!totals[e.category]) totals[e.category] = {};
       totals[e.category][curr] = (totals[e.category][curr] || 0) + e.amount;
     });
-    // Sort by total amount across all currencies
+    // CRITICAL FIX: Sort by budget currency only to avoid mixing currencies
+    // Fallback to first available currency amount if budget currency not present
     return Object.entries(totals).sort((a, b) => {
-      const sumA = Object.values(a[1]).reduce((s, v) => s + v, 0);
-      const sumB = Object.values(b[1]).reduce((s, v) => s + v, 0);
-      return sumB - sumA;
+      const amountA = a[1][budgetCurrency] || Object.values(a[1])[0] || 0;
+      const amountB = b[1][budgetCurrency] || Object.values(b[1])[0] || 0;
+      return amountB - amountA;
     });
-  }, [filteredExpenses, currency]);
+  }, [filteredExpenses, currency, budgetCurrency]);
 
   // Auto-collapse older dates on month change (merge with existing state)
   useEffect(() => {
