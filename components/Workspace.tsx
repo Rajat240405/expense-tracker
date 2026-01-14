@@ -84,6 +84,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [customCurrencies, setCustomCurrencies] = useState<CustomCurrency[]>([]);
   const [budget, setBudget] = useState<number>(0);
+  const [budgetCurrency, setBudgetCurrency] = useState<string>('INR');
+  const [isBudgetCurrencyPickerOpen, setIsBudgetCurrencyPickerOpen] = useState<boolean>(false);
   
   // View State
   const [viewDate, setViewDate] = useState(new Date()); // For tracking current month view
@@ -166,6 +168,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       // Load categories and budget (always from localStorage for now)
       const savedCats = localStorage.getItem('custom_categories_v1');
       const savedBudget = localStorage.getItem('budget_v1');
+      const savedBudgetCurrency = localStorage.getItem('budget_currency_v1');
       const savedCustomCurrencies = localStorage.getItem('custom_currencies_v1');
       
       if (savedCats) {
@@ -173,6 +176,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       }
       if (savedBudget) {
         try { setBudget(parseFloat(savedBudget)); } catch (e) {}
+      }
+      if (savedBudgetCurrency) {
+        try { setBudgetCurrency(savedBudgetCurrency); } catch (e) {}
+      } else if (expenses.length > 0) {
+        // Default to first expense currency if not set
+        const firstCurrency = expenses[0].currency || 'INR';
+        setBudgetCurrency(firstCurrency);
+        localStorage.setItem('budget_currency_v1', firstCurrency);
       }
       if (savedCustomCurrencies) {
         try { setCustomCurrencies(JSON.parse(savedCustomCurrencies)); } catch (e) {}
@@ -196,6 +207,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   useEffect(() => {
     localStorage.setItem('budget_v1', budget.toString());
   }, [budget]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_currency_v1', budgetCurrency);
+  }, [budgetCurrency]);
 
   useEffect(() => {
     localStorage.setItem('custom_currencies_v1', JSON.stringify(customCurrencies));
@@ -282,10 +297,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     return totals;
   }, [filteredExpenses, currency]);
 
-  // Legacy single total (for budget comparison if same currency)
-  const total = useMemo(() => 
-    filteredExpenses.reduce((sum, ex) => sum + ex.amount, 0)
-  , [filteredExpenses]);
+  // Total for budget currency only
+  const totalInBudgetCurrency = useMemo(() => 
+    filteredExpenses
+      .filter(ex => (ex.currency || 'INR') === budgetCurrency)
+      .reduce((sum, ex) => sum + ex.amount, 0)
+  , [filteredExpenses, budgetCurrency]);
 
   // Calculate total for each date group - per currency
   const dateGroupTotalsByCurrency = useMemo(() => {
@@ -619,6 +636,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
           <div className="flex items-center gap-2 pr-2">
              <span className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">Budget</span>
+             <button
+               type="button"
+               onClick={() => setIsBudgetCurrencyPickerOpen(true)}
+               className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors px-1"
+               title="Change budget currency"
+             >
+               {getCurrencySymbol(budgetCurrency, customCurrencies)}
+             </button>
              <input 
                type="number"
                value={budget || ''}
@@ -634,13 +659,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       {/* Budget Status (Soft) */}
       {budget > 0 && (
         <div className="mb-8 text-sm font-medium dark:text-gray-300">
-          {budget - total >= 0 ? (
+          {totalInBudgetCurrency === 0 ? (
             <span className="text-gray-500 dark:text-gray-400">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${(budget - total).toFixed(2)}</span> left this month
+              No spending yet in {getCurrencySymbol(budgetCurrency, customCurrencies)} {CURRENCIES.find(c => c.code === budgetCurrency)?.name || customCurrencies.find(c => c.code === budgetCurrency)?.name || budgetCurrency}
+            </span>
+          ) : budget - totalInBudgetCurrency >= 0 ? (
+            <span className="text-gray-500 dark:text-gray-400">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{getCurrencySymbol(budgetCurrency, customCurrencies)}{(budget - totalInBudgetCurrency).toFixed(2)}</span> left in {getCurrencySymbol(budgetCurrency, customCurrencies)} budget this month
             </span>
           ) : (
              <span className="text-orange-600 dark:text-orange-400">
-               ${Math.abs(budget - total).toFixed(2)} over budget
+               {getCurrencySymbol(budgetCurrency, customCurrencies)}{Math.abs(budget - totalInBudgetCurrency).toFixed(2)} over {getCurrencySymbol(budgetCurrency, customCurrencies)} budget
              </span>
           )}
         </div>
@@ -1006,8 +1035,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           {budget > 0 && (
             <BudgetProgress
               budget={budget}
-              spent={total}
-              currency={currency}
+              spent={totalInBudgetCurrency}
+              currency={budgetCurrency}
             />
           )}
 
@@ -1139,6 +1168,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           setCustomCurrencies(prev => [...prev, newCurrency]);
         }}
         onClose={() => setIsCurrencyPickerOpen(false)}
+      />
+
+      <CurrencyPickerModal
+        isOpen={isBudgetCurrencyPickerOpen}
+        selectedCurrency={budgetCurrency}
+        currencies={CURRENCIES}
+        customCurrencies={customCurrencies}
+        onSelect={(code) => setBudgetCurrency(code)}
+        onAddCustom={(newCurrency) => {
+          setCustomCurrencies(prev => [...prev, newCurrency]);
+        }}
+        onClose={() => setIsBudgetCurrencyPickerOpen(false)}
       />
 
     </div>

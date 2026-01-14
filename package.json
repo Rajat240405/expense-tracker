@@ -8,17 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync",
-    "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",
-    "cap:run:android": "npm run cap:sync && npx cap run android",
-    "cap:run:ios": "npm run cap:sync && npx cap run ios"
+    "cap:run:android": "npm run cap:sync && npx cap run android"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
     "@capacitor/app": "^8.0.0",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
-    "@capacitor/ios": "^8.0.0",
     "@headlessui/react": "^2.2.9",
     "@supabase/supabase-js": "^2.89.0",
     "date-fns": "^4.1.0",
