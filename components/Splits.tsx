@@ -40,9 +40,14 @@ const Splits: React.FC<SplitsProps> = ({ customCurrencies, getCurrencySymbol, on
     localStorage.setItem('splits_v1', JSON.stringify(splits));
   }, [splits]);
 
-  // Filter only unsettled splits
+  // Filter only unsettled splits and sort by date (newest first), then timestamp
   const pendingSplits = useMemo(() => {
-    return splits.filter(s => !s.settled).sort((a, b) => b.timestamp - a.timestamp);
+    return splits.filter(s => !s.settled).sort((a, b) => {
+      // First compare by date (newest first)
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      // If dates are same, sort by timestamp (newest first)
+      return b.timestamp - a.timestamp;
+    });
   }, [splits]);
 
   // Calculate totals by currency
@@ -277,6 +282,7 @@ const Splits: React.FC<SplitsProps> = ({ customCurrencies, getCurrencySymbol, on
         onAdd={handleAddSplit}
         defaultCurrency="INR"
         getCurrencySymbol={getCurrencySymbol}
+        customCurrencies={customCurrencies}
       />
     </div>
   );
