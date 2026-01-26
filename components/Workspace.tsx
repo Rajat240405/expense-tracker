@@ -558,10 +558,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
               </button>
             )}
             <div>
-              <div className="flex items-center gap-2 mb-2 text-gray-400 dark:text-gray-500 text-sm font-medium">
-                <span>Workspace</span>
-                <span className="opacity-40">/</span>
-                <span>Expenses</span>
+              <div className="flex items-center gap-2 mb-2">
+                <img src="/assets/branding/logo.png" alt="" className="w-6 h-6" />
+                <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Workspace</span>
+                <span className="text-gray-400 dark:text-gray-500 opacity-40">/</span>
+                <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Expenses</span>
               </div>
               <h1 className="text-4xl font-bold text-[#37352f] dark:text-gray-100 tracking-tight">Expenses</h1>
             </div>
