@@ -2,7 +2,6 @@ import React, { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { DayPicker } from 'react-day-picker';
 import { format, parse } from 'date-fns';
-// import 'react-day-picker/src/style.css';
 
 interface DatePickerModalProps {
   isOpen: boolean;
@@ -251,7 +250,7 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
           }
 
           .dark .date-picker-custom .rdp-button {
-            color: #e5e7eb;
+            color: #d1d5db;
           }
 
           .date-picker-custom .rdp-button:hover:not(:disabled):not(.selected-day) {

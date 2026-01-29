@@ -29,7 +29,7 @@ const getCurrencySymbol = (code: string = 'USD', customCurrencies: CustomCurrenc
   // Check custom currencies first
   const custom = customCurrencies.find(c => c.code === code);
   if (custom) return custom.symbol;
-  
+
   // Then check standard currencies
   return CURRENCIES.find(c => c.code === code)?.symbol || '$';
 };
@@ -52,15 +52,26 @@ const formatDateDisplay = (dateStr: string): string => {
   }
 };
 
+// Helper to format date for short display (dd MMM)
+const formatShortDate = (dateStr: string): string => {
+  // dateStr is in YYYY-MM-DD format
+  try {
+    const date = parse(dateStr, 'yyyy-MM-dd', new Date());
+    return format(date, 'dd MMM');
+  } catch {
+    return dateStr;
+  }
+};
+
 // Helper to format date groups
 const getDateLabel = (dateStr: string) => {
   const today = new Date();
   const date = new Date(dateStr);
-  
+
   // Reset times for comparison
   const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  
+
   const diffTime = t.getTime() - d.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
@@ -68,7 +79,7 @@ const getDateLabel = (dateStr: string) => {
   if (diffDays === 1) return 'Yesterday';
   if (diffDays >= 2 && diffDays <= 7) return 'This Week';
   if (diffDays >= 8 && diffDays <= 14) return 'Last Week';
-  
+
   // For older dates, group by month
   return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };
@@ -86,11 +97,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const [budget, setBudget] = useState<number>(0);
   const [budgetCurrency, setBudgetCurrency] = useState<string>('INR');
   const [isBudgetCurrencyPickerOpen, setIsBudgetCurrencyPickerOpen] = useState<boolean>(false);
-  
+
   // View State
   const [viewDate, setViewDate] = useState(new Date()); // For tracking current month view
   const [activeView, setActiveView] = useState<WorkspaceView>('expenses');
-  
+
   // Add Form State
   const [amount, setAmount] = useState<string>('');
   const [category, setCategory] = useState<string>('Food');
@@ -100,7 +111,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const [customCategoryInput, setCustomCategoryInput] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [dateInput, setDateInput] = useState<string>(new Date().toISOString().split('T')[0]);
-  
+
   // Picker Modal States
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState<boolean>(false);
@@ -135,7 +146,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         // Authenticated: Load from Supabase
         const cloudExpenses = await DataSyncService.fetchExpenses(user.id);
         setExpenses(cloudExpenses);
-        
+
         // Check if we need to migrate local data
         if (!hasCheckedMigration) {
           const localExpenses = localStorage.getItem('expenses_v1');
@@ -170,15 +181,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       const savedBudget = localStorage.getItem('budget_v1');
       const savedBudgetCurrency = localStorage.getItem('budget_currency_v1');
       const savedCustomCurrencies = localStorage.getItem('custom_currencies_v1');
-      
+
       if (savedCats) {
-        try { setCustomCategories(JSON.parse(savedCats)); } catch (e) {}
+        try { setCustomCategories(JSON.parse(savedCats)); } catch (e) { }
       }
       if (savedBudget) {
-        try { setBudget(parseFloat(savedBudget)); } catch (e) {}
+        try { setBudget(parseFloat(savedBudget)); } catch (e) { }
       }
       if (savedBudgetCurrency) {
-        try { setBudgetCurrency(savedBudgetCurrency); } catch (e) {}
+        try { setBudgetCurrency(savedBudgetCurrency); } catch (e) { }
       } else if (expenses.length > 0) {
         // Default to first expense currency if not set
         const firstCurrency = expenses[0].currency || 'INR';
@@ -186,7 +197,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         localStorage.setItem('budget_currency_v1', firstCurrency);
       }
       if (savedCustomCurrencies) {
-        try { setCustomCurrencies(JSON.parse(savedCustomCurrencies)); } catch (e) {}
+        try { setCustomCurrencies(JSON.parse(savedCustomCurrencies)); } catch (e) { }
       }
     };
 
@@ -241,7 +252,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   }, [customCategories]);
 
   const currentMonthKey = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}`;
-  
+
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => e.date.startsWith(currentMonthKey));
   }, [expenses, currentMonthKey]);
@@ -259,18 +270,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       if (!groups[label]) groups[label] = [];
       groups[label].push(e);
     });
-    
+
     // Sort groups by priority order
     const groupOrder = ['Today', 'Yesterday', 'This Week', 'Last Week'];
     const sortedGroups: { [key: string]: Expense[] } = {};
-    
+
     // First add priority groups
     groupOrder.forEach(key => {
       if (groups[key]) {
         sortedGroups[key] = groups[key];
       }
     });
-    
+
     // Then add month groups (sorted by most recent first)
     Object.keys(groups)
       .filter(key => !groupOrder.includes(key))
@@ -283,7 +294,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       .forEach(key => {
         sortedGroups[key] = groups[key];
       });
-    
+
     return sortedGroups;
   }, [filteredExpenses]);
 
@@ -298,11 +309,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   }, [filteredExpenses, currency]);
 
   // Total for budget currency only
-  const totalInBudgetCurrency = useMemo(() => 
+  const totalInBudgetCurrency = useMemo(() =>
     filteredExpenses
       .filter(ex => (ex.currency || 'INR') === budgetCurrency)
       .reduce((sum, ex) => sum + ex.amount, 0)
-  , [filteredExpenses, budgetCurrency]);
+    , [filteredExpenses, budgetCurrency]);
 
   // Calculate total for each date group - per currency
   const dateGroupTotalsByCurrency = useMemo(() => {
@@ -446,7 +457,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       setDeletedExpense(null);
       setUndoTimer(null);
     }, 5000);
-    
+
     setUndoTimer(timer);
   }, [expenses, undoTimer, isGuest, user]);
 
@@ -483,7 +494,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
   const saveEdit = useCallback(async () => {
     if (!editingId || !editForm) return;
-    
+
     const updatedExpense = expenses.find(ex => ex.id === editingId);
     if (!updatedExpense) return;
 
@@ -516,7 +527,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   // Handle hardware back button
   useEffect(() => {
     let listener: any;
-    
+
     const setupBackButton = async () => {
       // Only setup for Capacitor (mobile)
       if (typeof window !== 'undefined' && (window as any).Capacitor) {
@@ -540,8 +551,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 min-h-screen font-sans">
-      
+    <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 font-sans">
+
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
         <div className="flex items-center justify-between w-full md:w-auto">
@@ -553,7 +564,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 title="Back to landing"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
             )}
@@ -575,7 +586,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 onClick={() => setIsAuthModalOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 Sync
               </button>
             ) : (
@@ -602,7 +613,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 onClick={() => setIsAuthModalOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 Sync
               </button>
             ) : (
@@ -620,40 +631,40 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           </div>
 
           <div className="flex items-center gap-6 bg-gray-50/80 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Previous month">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsMonthPickerOpen(true)}
-              className="text-sm font-semibold text-[#37352f] dark:text-gray-100 bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </button>
-            <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Next month">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-          <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-          <div className="flex items-center gap-2 pr-2">
-             <span className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">Budget</span>
-             <button
-               type="button"
-               onClick={() => setIsBudgetCurrencyPickerOpen(true)}
-               className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors px-1"
-               title="Change budget currency"
-             >
-               {getCurrencySymbol(budgetCurrency, customCurrencies)}
-             </button>
-             <input 
-               type="number"
-               value={budget || ''}
-               onChange={(e) => setBudget(parseFloat(e.target.value))}
-               placeholder="Set..."
-               className="w-20 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:border-blue-500 outline-none text-sm font-medium text-[#37352f] dark:text-gray-100 text-right p-0"
-             />
-          </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Previous month">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMonthPickerOpen(true)}
+                className="text-sm font-semibold text-[#37352f] dark:text-gray-100 bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </button>
+              <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Next month">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
+            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+            <div className="flex items-center gap-2 pr-2">
+              <span className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">Budget</span>
+              <button
+                type="button"
+                onClick={() => setIsBudgetCurrencyPickerOpen(true)}
+                className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors px-1"
+                title="Change budget currency"
+              >
+                {getCurrencySymbol(budgetCurrency, customCurrencies)}
+              </button>
+              <input
+                type="number"
+                value={budget || ''}
+                onChange={(e) => setBudget(parseFloat(e.target.value))}
+                placeholder="Set..."
+                className="w-20 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:border-blue-500 outline-none text-sm font-medium text-[#37352f] dark:text-gray-100 text-right p-0"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -670,9 +681,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{getCurrencySymbol(budgetCurrency, customCurrencies)}{(budget - totalInBudgetCurrency).toFixed(2)}</span> left in {getCurrencySymbol(budgetCurrency, customCurrencies)} budget this month
             </span>
           ) : (
-             <span className="text-orange-600 dark:text-orange-400">
-               {getCurrencySymbol(budgetCurrency, customCurrencies)}{Math.abs(budget - totalInBudgetCurrency).toFixed(2)} over {getCurrencySymbol(budgetCurrency, customCurrencies)} budget
-             </span>
+            <span className="text-orange-600 dark:text-orange-400">
+              {getCurrencySymbol(budgetCurrency, customCurrencies)}{Math.abs(budget - totalInBudgetCurrency).toFixed(2)} over {getCurrencySymbol(budgetCurrency, customCurrencies)} budget
+            </span>
           )}
         </div>
       )}
@@ -681,11 +692,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       <div className="mb-8 flex gap-2 border-b border-gray-200 dark:border-gray-700">
         <button
           onClick={() => setActiveView('expenses')}
-          className={`px-4 py-3 text-sm font-semibold transition-all ${
-            activeView === 'expenses'
-              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
+          className={`px-4 py-3 text-sm font-semibold transition-all ${activeView === 'expenses'
+            ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
         >
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -696,11 +706,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         </button>
         <button
           onClick={() => setActiveView('splits')}
-          className={`px-4 py-3 text-sm font-semibold transition-all ${
-            activeView === 'splits'
-              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
+          className={`px-4 py-3 text-sm font-semibold transition-all ${activeView === 'splits'
+            ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
         >
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -719,344 +728,391 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         />
       ) : (
         <>
-      {/* Add Expense Form */}
-      <div className="mb-12 border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm transition-all hover:shadow-md">
-        <form onSubmit={addExpense} className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            
-            {/* Date */}
-            <div className="md:col-span-2">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Date</label>
-              <button
-                type="button"
-                onClick={() => setIsDatePickerOpen(true)}
-                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
-              >
-                <span>{formatDateDisplay(dateInput)}</span>
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </div>
+          {/* Add Expense Form */}
+          <div className="mb-12 border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm transition-all hover:shadow-md">
+            <form onSubmit={addExpense} className="flex flex-col gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
 
-            {/* Amount */}
-            <div className="md:col-span-2">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Amount</label>
-              <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded hover:border-gray-300 dark:hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
-                <span className="pl-3 text-gray-500 dark:text-gray-400 text-sm font-medium">{getCurrencySymbol(currency, customCurrencies)}</span>
-                <input
-                  type="number"
-                  required
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  className="flex-1 px-2 py-2.5 bg-transparent border-0 text-sm font-medium text-[#37352f] dark:text-gray-100 outline-none placeholder-gray-300 dark:placeholder-gray-600"
-                />
-              </div>
-            </div>
-
-            {/* Currency */}
-            <div className="md:col-span-2">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Currency</label>
-              <button
-                type="button"
-                onClick={() => setIsCurrencyPickerOpen(true)}
-                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
-              >
-                <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-                </svg>
-              </button>
-            </div>
-
-            {/* Category */}
-            <div className="md:col-span-3">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Category</label>
-              {isCustomCategory ? (
-                <input
-                  type="text"
-                  value={customCategoryInput}
-                  onChange={(e) => setCustomCategoryInput(e.target.value)}
-                  placeholder="Type custom category..."
-                  className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-blue-500 rounded text-sm text-[#37352f] dark:text-gray-100 outline-none ring-1 ring-blue-500"
-                  autoFocus
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsCategorySelectorOpen(true)}
-                  className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                >
-                  <span>{category}</span>
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            {/* Note */}
-            <div className="md:col-span-3">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Note</label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Description (optional)"
-                className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-colors"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end pt-1">
-            <button
-              type="submit"
-              className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-sm"
-            >
-              Add Entry
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Main List */}
-      <div className="space-y-8">
-        {Object.keys(groupedExpenses).length === 0 ? (
-          <div className="text-center py-20 px-6">
-            <div className="max-w-sm mx-auto">
-              <div className="text-6xl mb-4">📝</div>
-              <h3 className="text-lg font-semibold text-[#37352f] dark:text-gray-100 mb-2">
-                No expenses for {viewDate.toLocaleDateString('en-US', { month: 'long' })}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Start tracking your spending by adding your first expense above.
-              </p>
-              <div className="inline-flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-full border border-gray-100 dark:border-gray-700">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                </svg>
-                <span>Track · Budget · Save</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          Object.keys(groupedExpenses).map(dateLabel => {
-            const isCollapsed = collapsedDates.has(dateLabel);
-            const expenseCount = groupedExpenses[dateLabel].length;
-            
-            return (
-            <div key={dateLabel}>
-              <button
-                onClick={() => toggleDateGroup(dateLabel)}
-                className="w-full flex items-center justify-between mb-3 ml-1 group hover:opacity-80 transition-opacity"
-              >
-                <div className="flex items-center gap-2">
-                  <svg 
-                    className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
+                {/* Date */}
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Date</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(true)}
+                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    {dateLabel}
-                    {isCollapsed && <span className="ml-2 text-gray-400 dark:text-gray-600">({expenseCount})</span>}
-                  </h3>
+                    <span>{formatDateDisplay(dateInput)}</span>
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </button>
                 </div>
-                {dateGroupTotalsByCurrency[dateLabel] && Object.keys(dateGroupTotalsByCurrency[dateLabel]).length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {Object.entries(dateGroupTotalsByCurrency[dateLabel]).map(([curr, amount]) => (
-                      <span key={curr} className="text-sm font-bold text-[#37352f] dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700">
-                        {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
-                      </span>
-                    ))}
+
+                {/* Amount */}
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Amount</label>
+                  <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded hover:border-gray-300 dark:hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
+                    <span className="pl-3 text-gray-500 dark:text-gray-400 text-sm font-medium">{getCurrencySymbol(currency, customCurrencies)}</span>
+                    <input
+                      type="number"
+                      required
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      className="flex-1 px-2 py-2.5 bg-transparent border-0 text-sm font-medium text-[#37352f] dark:text-gray-100 outline-none placeholder-gray-300 dark:placeholder-gray-600"
+                    />
                   </div>
-                )}
-              </button>
-              {!isCollapsed && (
-              <div className="space-y-1">
-                {groupedExpenses[dateLabel].map(expense => (
-                  <div 
-                    key={expense.id}
-                    className="group relative flex items-center gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all duration-200"
+                </div>
+
+                {/* Currency */}
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Currency</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCurrencyPickerOpen(true)}
+                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
                   >
-                    {/* Inline Edit Mode */}
-                    {editingId === expense.id ? (
-                      <div className="flex-1 flex flex-col gap-3">
-                        <div className="flex gap-3 items-center">
-                          <div className="w-24">
-                            <input 
-                              type="number"
-                              value={editForm.amount}
-                              onChange={e => setEditForm(prev => ({...prev, amount: parseFloat(e.target.value)}))}
-                              className="w-full p-2.5 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 focus:outline-none"
-                              autoFocus
-                            />
-                          </div>
-                          <button
-                            onClick={() => setIsEditCategorySelectorOpen(true)}
-                            className="flex-1 p-2.5 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left font-medium flex items-center justify-between"
-                          >
-                            <span>{editForm.category}</span>
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          <div className="flex gap-2">
-                            <button onClick={saveEdit} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors">Save</button>
-                            <button onClick={cancelEdit} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-sm px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">✕</button>
-                          </div>
-                        </div>
-                        <textarea 
-                          value={editForm.note || ''}
-                          onChange={e => setEditForm(prev => ({...prev, note: e.target.value}))}
-                          placeholder="Add a description..."
-                          className="w-full p-3 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 focus:outline-none resize-none leading-relaxed"
-                          rows={3}
-                          style={{ minHeight: '90px' }}
-                        />
+                    <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Category */}
+                <div className="md:col-span-3">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Category</label>
+                  {isCustomCategory ? (
+                    <input
+                      type="text"
+                      value={customCategoryInput}
+                      onChange={(e) => setCustomCategoryInput(e.target.value)}
+                      placeholder="Type custom category..."
+                      className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-blue-500 rounded text-sm text-[#37352f] dark:text-gray-100 outline-none ring-1 ring-blue-500"
+                      autoFocus
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsCategorySelectorOpen(true)}
+                      className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    >
+                      <span>{category}</span>
+                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Note */}
+                <div className="md:col-span-3">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Note</label>
+                  <input
+                    type="text"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Description (optional)"
+                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-colors"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-sm"
+                >
+                  Add Entry
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Main List */}
+          <div className="space-y-8">
+            {Object.keys(groupedExpenses).length === 0 ? (
+              <div className="text-center py-20 px-6">
+                <div className="max-w-sm mx-auto">
+                  <div className="text-6xl mb-4">📝</div>
+                  <h3 className="text-lg font-semibold text-[#37352f] dark:text-gray-100 mb-2">
+                    No expenses for {viewDate.toLocaleDateString('en-US', { month: 'long' })}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                    Start tracking your spending by adding your first expense above.
+                  </p>
+                  <div className="inline-flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-full border border-gray-100 dark:border-gray-700">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <span>Track · Budget · Save</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              Object.keys(groupedExpenses).map(dateLabel => {
+                const isCollapsed = collapsedDates.has(dateLabel);
+                const expenseCount = groupedExpenses[dateLabel].length;
+
+                return (
+                  <div key={dateLabel}>
+                    <button
+                      onClick={() => toggleDateGroup(dateLabel)}
+                      className="w-full flex items-center justify-between mb-3 ml-1 group hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg
+                          className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                          {dateLabel}
+                          {isCollapsed && <span className="ml-2 text-gray-400 dark:text-gray-600">({expenseCount})</span>}
+                        </h3>
                       </div>
-                    ) : (
-                      /* Display Mode */
-                      <>
-                        <div className="flex items-start gap-3 flex-1 overflow-hidden">
-                           <span className={`
-                             flex-shrink-0 px-2.5 py-1 rounded text-xs font-semibold tracking-wide
-                             ${getCategoryColor(expense.category)}
-                           `}>
-                             {expense.category}
-                           </span>
-                           <div className="flex-1 min-w-0">
-                             <span className="block text-base text-[#37352f] dark:text-gray-100 line-clamp-1 break-words">
-                               {expense.note || <span className="text-gray-300 dark:text-gray-600 italic text-sm">No note</span>}
-                             </span>
-                           </div>
+                      {dateGroupTotalsByCurrency[dateLabel] && Object.keys(dateGroupTotalsByCurrency[dateLabel]).length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          {Object.entries(dateGroupTotalsByCurrency[dateLabel]).map(([curr, amount]) => (
+                            <span key={curr} className="text-sm font-bold text-[#37352f] dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700">
+                              {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                            </span>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                           <span className="text-base font-semibold text-[#37352f] dark:text-gray-100 font-mono">
-                             {getCurrencySymbol(expense.currency || currency, customCurrencies)}{expense.amount.toFixed(2)}
-                           </span>
-                           <button
-                            onClick={() => startEditing(expense)}
-                            className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 active:text-blue-600 dark:active:text-blue-300 transition-colors p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 active:bg-blue-100 dark:active:bg-blue-900/50 md:opacity-0 md:group-hover:opacity-100"
-                            title="Edit expense"
-                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                           </button>
-                           <button
-                            onClick={() => deleteExpense(expense.id)}
-                            className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 active:text-red-600 dark:active:text-red-300 transition-colors p-2 rounded hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 dark:active:bg-red-900/50 md:opacity-0 md:group-hover:opacity-100"
-                            title="Delete expense"
-                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                           </button>
-                        </div>
-                      </>
+                      )}
+                    </button>
+                    {!isCollapsed && (
+                      <div className="space-y-1">
+                        {/* Group expenses by actual date within this date label group */}
+                        {Object.entries(
+                          groupedExpenses[dateLabel].reduce((acc: { [date: string]: Expense[] }, expense) => {
+                            if (!acc[expense.date]) acc[expense.date] = [];
+                            acc[expense.date].push(expense);
+                            return acc;
+                          }, {})
+                        )
+                          .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+                          .map(([date, expensesForDate]) => {
+                            // Calculate total for this specific date, grouped by currency
+                            const dateTotals: { [currency: string]: number } = {};
+                            expensesForDate.forEach(expense => {
+                              const curr = expense.currency || currency;
+                              dateTotals[curr] = (dateTotals[curr] || 0) + expense.amount;
+                            });
+
+                            return (
+                              <div key={date}>
+                                {/* Date Separator with Daily Total */}
+                                <div className="flex items-center gap-3 my-4 first:mt-0">
+                                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                                  <div className="flex items-center gap-2 px-2">
+                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
+                                      {formatShortDate(date)}
+                                    </span>
+                                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {Object.entries(dateTotals).map(([curr, amount]) => (
+                                        <span key={curr} className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                          {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                                </div>
+
+                                {/* Expenses for this date */}
+                                {expensesForDate.map(expense => (
+                                  <div
+                                    key={expense.id}
+                                    className="group relative flex items-center gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all duration-200"
+                                  >
+                                    {/* Inline Edit Mode */}
+                                    {editingId === expense.id ? (
+                                      <div className="flex-1 flex flex-col gap-3">
+                                        <div className="flex gap-3 items-center">
+                                          <div className="w-24">
+                                            <input
+                                              type="number"
+                                              value={editForm.amount}
+                                              onChange={e => setEditForm(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
+                                              className="w-full p-2.5 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 focus:outline-none"
+                                              autoFocus
+                                            />
+                                          </div>
+                                          <button
+                                            onClick={() => setIsEditCategorySelectorOpen(true)}
+                                            className="flex-1 p-2.5 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left font-medium flex items-center justify-between"
+                                          >
+                                            <span>{editForm.category}</span>
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                          </button>
+                                          <div className="flex gap-2">
+                                            <button onClick={saveEdit} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors">Save</button>
+                                            <button onClick={cancelEdit} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-sm px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">✕</button>
+                                          </div>
+                                        </div>
+                                        <textarea
+                                          value={editForm.note || ''}
+                                          onChange={e => setEditForm(prev => ({ ...prev, note: e.target.value }))}
+                                          placeholder="Add a description..."
+                                          className="w-full p-3 border border-blue-400 dark:border-blue-500 rounded-lg text-sm bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 focus:outline-none resize-none leading-relaxed"
+                                          rows={3}
+                                          style={{ minHeight: '90px' }}
+                                        />
+                                      </div>
+                                    ) : (
+                                      /* Display Mode */
+                                      <>
+                                        <div className="flex items-start gap-3 flex-1 overflow-hidden">
+                                          <span className={`
+                                   flex-shrink-0 px-2.5 py-1 rounded text-xs font-semibold tracking-wide
+                                   ${getCategoryColor(expense.category)}
+                                 `}>
+                                            {expense.category}
+                                          </span>
+                                          <div className="flex-1 min-w-0">
+                                            <span className="block text-base text-[#37352f] dark:text-gray-100 line-clamp-1 break-words">
+                                              {expense.note || <span className="text-gray-300 dark:text-gray-600 italic text-sm">No note</span>}
+                                            </span>
+                                            {!expense.note && (
+                                              <span className="block text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                No note
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          <span className="text-base font-semibold text-[#37352f] dark:text-gray-100 font-mono">
+                                            {getCurrencySymbol(expense.currency || currency, customCurrencies)}{expense.amount.toFixed(2)}
+                                          </span>
+                                          <button
+                                            onClick={() => startEditing(expense)}
+                                            className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 active:text-blue-600 dark:active:text-blue-300 transition-colors p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 active:bg-blue-100 dark:active:bg-blue-900/50 md:opacity-0 md:group-hover:opacity-100"
+                                            title="Edit expense"
+                                          >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                          </button>
+                                          <button
+                                            onClick={() => deleteExpense(expense.id)}
+                                            className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 active:text-red-600 dark:active:text-red-300 transition-colors p-2 rounded hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 dark:active:bg-red-900/50 md:opacity-0 md:group-hover:opacity-100"
+                                            title="Delete expense"
+                                          >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })}
+                      </div>
                     )}
                   </div>
-                ))}
+                );
+              })
+            )}
+          </div>
+
+          {/* Category Breakdown - Collapsible Accordion */}
+          {filteredExpenses.length > 0 && (
+            <div className="mt-16 pt-8 border-t border-gray-100">
+              {/* Accordion Header */}
+              <button
+                onClick={toggleBreakdown}
+                className="w-full flex items-center justify-between p-4 -mx-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors group"
+              >
+                <h4 className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                  Breakdown ({viewDate.toLocaleDateString('en-US', { month: 'long' })})
+                </h4>
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isBreakdownOpen ? 'rotate-180' : 'rotate-0'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Accordion Content */}
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${isBreakdownOpen ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
+                  }`}
+              >
+                <div className="space-y-3">
+                  {categoryTotalsByCurrency.map(([cat, currencyAmounts]) => (
+                    <div
+                      key={cat}
+                      className="py-2.5 px-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cat}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(currencyAmounts).map(([curr, amount]) => (
+                          <span key={curr} className="text-sm text-[#37352f] dark:text-gray-100 font-mono">
+                            {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Total Row - Multi-Currency */}
+                  <div className="py-3 px-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border-t-2 border-blue-200 dark:border-blue-700 mt-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-blue-900 dark:text-blue-300">Total</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {Object.entries(totalsByCurrency).map(([curr, amount]) => (
+                        <span key={curr} className="text-base font-bold text-blue-900 dark:text-blue-300 font-mono">
+                          {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-              )}
             </div>
-          );
-          })
-        )}
-      </div>
-
-      {/* Category Breakdown - Collapsible Accordion */}
-      {filteredExpenses.length > 0 && (
-        <div className="mt-16 pt-8 border-t border-gray-100">
-           {/* Accordion Header */}
-           <button
-             onClick={toggleBreakdown}
-             className="w-full flex items-center justify-between p-4 -mx-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors group"
-           >
-             <h4 className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
-               Breakdown ({viewDate.toLocaleDateString('en-US', { month: 'long' })})
-             </h4>
-             <svg 
-               className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isBreakdownOpen ? 'rotate-180' : 'rotate-0'}`}
-               fill="none" 
-               stroke="currentColor" 
-               viewBox="0 0 24 24"
-             >
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-             </svg>
-           </button>
-
-           {/* Accordion Content */}
-           <div 
-             className={`overflow-hidden transition-all duration-300 ease-in-out ${
-               isBreakdownOpen ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
-             }`}
-           >
-             <div className="space-y-3">
-               {categoryTotalsByCurrency.map(([cat, currencyAmounts]) => (
-                 <div 
-                   key={cat} 
-                   className="py-2.5 px-3 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                 >
-                   <div className="flex items-center justify-between mb-1">
-                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cat}</span>
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                     {Object.entries(currencyAmounts).map(([curr, amount]) => (
-                       <span key={curr} className="text-sm text-[#37352f] dark:text-gray-100 font-mono">
-                         {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
-                       </span>
-                     ))}
-                   </div>
-                 </div>
-               ))}
-               
-               {/* Total Row - Multi-Currency */}
-               <div className="py-3 px-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border-t-2 border-blue-200 dark:border-blue-700 mt-2">
-                 <div className="flex items-center justify-between mb-2">
-                   <span className="text-sm font-bold text-blue-900 dark:text-blue-300">Total</span>
-                 </div>
-                 <div className="flex flex-wrap gap-3">
-                   {Object.entries(totalsByCurrency).map(([curr, amount]) => (
-                     <span key={curr} className="text-base font-bold text-blue-900 dark:text-blue-300 font-mono">
-                       {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
-                     </span>
-                   ))}
-                 </div>
-               </div>
-             </div>
-           </div>
-        </div>
-      )}
-
-      {/* Data Visualizations */}
-      {filteredExpenses.length > 0 && (
-        <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-800 space-y-6">
-          {/* Budget Progress - Only show if budget is set */}
-          {budget > 0 && (
-            <BudgetProgress
-              budget={budget}
-              spent={totalInBudgetCurrency}
-              currency={budgetCurrency}
-            />
           )}
 
-          {/* Monthly Trend Line Chart */}
-          <LineChartMonthly
-            expenses={filteredExpenses}
-            currency={currency}
-          />
+          {/* Data Visualizations */}
+          {filteredExpenses.length > 0 && (
+            <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-800 space-y-6">
+              {/* Budget Progress - Only show if budget is set */}
+              {budget > 0 && (
+                <BudgetProgress
+                  budget={budget}
+                  spent={totalInBudgetCurrency}
+                  currency={budgetCurrency}
+                />
+              )}
 
-          {/* Category Distribution Donut Chart */}
-          <DonutChartCategories
-            expenses={filteredExpenses}
-            currency={currency}
-          />
-        </div>
-      )}
-      </>
-      )}
+              {/* Monthly Trend Line Chart */}
+              <LineChartMonthly
+                expenses={filteredExpenses}
+                currency={currency}
+              />
+
+              {/* Category Distribution Donut Chart */}
+              <DonutChartCategories
+                expenses={filteredExpenses}
+                currency={currency}
+              />
+            </div>
+          )}
+        </>
+      )
+      }
 
       {/* Undo Delete Snackbar */}
       {deletedExpense && (
@@ -1149,7 +1205,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         selectedCategory={editForm.category || ''}
         categories={allCategories}
         onSelect={(cat) => {
-          setEditForm(prev => ({...prev, category: cat}));
+          setEditForm(prev => ({ ...prev, category: cat }));
           setIsEditCategorySelectorOpen(false);
         }}
         onClose={() => setIsEditCategorySelectorOpen(false)}
@@ -1211,7 +1267,7 @@ const PASTEL_COLORS = [
 
 function getCategoryColor(category: string): string {
   const normalized = category.trim().toLowerCase();
-  
+
   // Specific Overrides for Default Categories
   if (normalized === 'food') return 'bg-orange-100 text-orange-800';
   if (normalized === 'travel') return 'bg-emerald-100 text-emerald-800';
@@ -1224,7 +1280,7 @@ function getCategoryColor(category: string): string {
   for (let i = 0; i < normalized.length; i++) {
     hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   const index = Math.abs(hash) % PASTEL_COLORS.length;
   return PASTEL_COLORS[index];
 }
