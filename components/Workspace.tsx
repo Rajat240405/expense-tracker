@@ -553,117 +553,119 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   return (
     <div className="max-w-4xl mx-auto px-6 py-16 md:py-24">
 
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
-        <div className="flex items-center justify-between w-full md:w-auto">
+      {/* Sticky Header & Controls */}
+      <div className="sticky top-0 -mx-6 px-6 py-6 mb-6 glass backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 z-50 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="flex items-center justify-between w-full md:w-auto">
+            <div className="flex items-center gap-3">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-smooth btn-press"
+                  title="Back to landing"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <img src="/assets/branding/logo.png" alt="" className="w-6 h-6" />
+                  <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Workspace</span>
+                  <span className="text-gray-400 dark:text-gray-500 opacity-40">/</span>
+                  <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Expenses</span>
+                </div>
+                <h1 className="text-5xl md:text-6xl font-bold text-[#37352f] dark:text-gray-100 tracking-tight leading-tight">Expenses</h1>
+              </div>
+            </div>
+
+            {/* Auth UI */}
+            <div className="md:hidden">
+              {isGuest ? (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-smooth btn-press shadow-subtle"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  Sync
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px]">{user?.email}</span>
+                  <button
+                    onClick={() => signOut()}
+                    className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-smooth btn-press rounded-lg"
+                    title="Sign out"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Month & Budget Controls */}
           <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-smooth btn-press"
-                title="Back to landing"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <img src="/assets/branding/logo.png" alt="" className="w-6 h-6" />
-                <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Workspace</span>
-                <span className="text-gray-400 dark:text-gray-500 opacity-40">/</span>
-                <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Expenses</span>
-              </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-[#37352f] dark:text-gray-100 tracking-tight leading-tight">Expenses</h1>
+            {/* Desktop Auth UI */}
+            <div className="hidden md:flex items-center">
+              {isGuest ? (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-smooth btn-press shadow-subtle"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  Sync
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]">{user?.email}</span>
+                  <button
+                    onClick={() => signOut()}
+                    className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                    title="Sign out"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Auth UI */}
-          <div className="md:hidden">
-            {isGuest ? (
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-smooth btn-press shadow-subtle"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                Sync
-              </button>
-            ) : (
+            <div className="flex items-center gap-6 glass-card p-2 rounded-xl shadow-subtle">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px]">{user?.email}</span>
+                <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Previous month">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                </button>
                 <button
-                  onClick={() => signOut()}
-                  className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-smooth btn-press rounded-lg"
-                  title="Sign out"
+                  type="button"
+                  onClick={() => setIsMonthPickerOpen(true)}
+                  className="text-sm font-semibold text-[#37352f] dark:text-gray-100 bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
-                  Sign out
+                  {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </button>
+                <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Next month">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Month & Budget Controls */}
-        <div className="flex items-center gap-3">
-          {/* Desktop Auth UI */}
-          <div className="hidden md:flex items-center">
-            {isGuest ? (
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-smooth btn-press shadow-subtle"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                Sync
-              </button>
-            ) : (
-              <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]">{user?.email}</span>
+              <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+              <div className="flex items-center gap-2 pr-2">
+                <span className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">Budget</span>
                 <button
-                  onClick={() => signOut()}
-                  className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                  title="Sign out"
+                  type="button"
+                  onClick={() => setIsBudgetCurrencyPickerOpen(true)}
+                  className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors px-1"
+                  title="Change budget currency"
                 >
-                  Sign out
+                  {getCurrencySymbol(budgetCurrency, customCurrencies)}
                 </button>
+                <input
+                  type="number"
+                  value={budget || ''}
+                  onChange={(e) => setBudget(parseFloat(e.target.value))}
+                  placeholder="Set..."
+                  className="w-20 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:border-blue-500 outline-none text-sm font-medium text-[#37352f] dark:text-gray-100 text-right p-0"
+                />
               </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-6 glass-card p-2 rounded-xl shadow-subtle">
-            <div className="flex items-center gap-2">
-              <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Previous month">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsMonthPickerOpen(true)}
-                className="text-sm font-semibold text-[#37352f] dark:text-gray-100 bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </button>
-              <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Next month">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-              </button>
-            </div>
-            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <div className="flex items-center gap-2 pr-2">
-              <span className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">Budget</span>
-              <button
-                type="button"
-                onClick={() => setIsBudgetCurrencyPickerOpen(true)}
-                className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors px-1"
-                title="Change budget currency"
-              >
-                {getCurrencySymbol(budgetCurrency, customCurrencies)}
-              </button>
-              <input
-                type="number"
-                value={budget || ''}
-                onChange={(e) => setBudget(parseFloat(e.target.value))}
-                placeholder="Set..."
-                className="w-20 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:border-blue-500 outline-none text-sm font-medium text-[#37352f] dark:text-gray-100 text-right p-0"
-              />
             </div>
           </div>
         </div>
