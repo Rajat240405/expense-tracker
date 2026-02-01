@@ -551,16 +551,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 font-sans">
+    <div className="max-w-4xl mx-auto px-6 py-16 md:py-24">
 
       {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3">
             {onBack && (
               <button
                 onClick={onBack}
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-smooth btn-press"
                 title="Back to landing"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -575,7 +575,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 <span className="text-gray-400 dark:text-gray-500 opacity-40">/</span>
                 <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">Expenses</span>
               </div>
-              <h1 className="text-4xl font-bold text-[#37352f] dark:text-gray-100 tracking-tight">Expenses</h1>
+              <h1 className="text-5xl md:text-6xl font-bold text-[#37352f] dark:text-gray-100 tracking-tight leading-tight">Expenses</h1>
             </div>
           </div>
 
@@ -584,7 +584,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {isGuest ? (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-smooth btn-press shadow-subtle"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 Sync
@@ -594,7 +594,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px]">{user?.email}</span>
                 <button
                   onClick={() => signOut()}
-                  className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-smooth btn-press rounded-lg"
                   title="Sign out"
                 >
                   Sign out
@@ -611,7 +611,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {isGuest ? (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-smooth btn-press shadow-subtle"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 Sync
@@ -630,7 +630,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             )}
           </div>
 
-          <div className="flex items-center gap-6 bg-gray-50/80 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-6 glass-card p-2 rounded-xl shadow-subtle">
             <div className="flex items-center gap-2">
               <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400" title="Previous month">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
@@ -729,17 +729,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       ) : (
         <>
           {/* Add Expense Form */}
-          <div className="mb-12 border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm transition-all hover:shadow-md">
-            <form onSubmit={addExpense} className="flex flex-col gap-5">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="mb-14 glass-card rounded-2xl p-6 shadow-card transition-smooth hover:shadow-elevation">
+            <form onSubmit={addExpense} className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
 
                 {/* Date */}
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Date</label>
+                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Date</label>
                   <button
                     type="button"
                     onClick={() => setIsDatePickerOpen(true)}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth"
                   >
                     <span>{formatDateDisplay(dateInput)}</span>
                     <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -750,8 +750,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
                 {/* Amount */}
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Amount</label>
-                  <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded hover:border-gray-300 dark:hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
+                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Amount</label>
+                  <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl hover:border-gray-300 dark:hover:border-gray-500 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 dark:focus-within:ring-blue-900 transition-smooth">
                     <span className="pl-3 text-gray-500 dark:text-gray-400 text-sm font-medium">{getCurrencySymbol(currency, customCurrencies)}</span>
                     <input
                       type="number"
@@ -761,18 +761,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                       placeholder="0.00"
                       step="0.01"
                       min="0"
-                      className="flex-1 px-2 py-2.5 bg-transparent border-0 text-sm font-medium text-[#37352f] dark:text-gray-100 outline-none placeholder-gray-300 dark:placeholder-gray-600"
+                      className="flex-1 px-3 py-3 bg-transparent border-0 text-sm font-medium text-[#37352f] dark:text-gray-100 outline-none placeholder-gray-300 dark:placeholder-gray-600 tabular-nums"
                     />
                   </div>
                 </div>
 
                 {/* Currency */}
                 <div className="md:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Currency</label>
+                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Currency</label>
                   <button
                     type="button"
                     onClick={() => setIsCurrencyPickerOpen(true)}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth"
                   >
                     <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
                     <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -783,21 +783,21 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
                 {/* Category */}
                 <div className="md:col-span-3">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Category</label>
+                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Category</label>
                   {isCustomCategory ? (
                     <input
                       type="text"
                       value={customCategoryInput}
                       onChange={(e) => setCustomCategoryInput(e.target.value)}
                       placeholder="Type custom category..."
-                      className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-blue-500 rounded text-sm text-[#37352f] dark:text-gray-100 outline-none ring-1 ring-blue-500"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-blue-500 rounded-xl text-sm text-[#37352f] dark:text-gray-100 outline-none ring-2 ring-blue-200 dark:ring-blue-900"
                       autoFocus
                     />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setIsCategorySelectorOpen(true)}
-                      className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
                     >
                       <span>{category}</span>
                       <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -809,20 +809,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
                 {/* Note */}
                 <div className="md:col-span-3">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold mb-2 ml-1">Note</label>
+                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Note</label>
                   <input
                     type="text"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Description (optional)"
-                    className="w-full px-3 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-colors"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-smooth"
                   />
                 </div>
               </div>
               <div className="flex justify-end pt-1">
                 <button
                   type="submit"
-                  className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-sm"
+                  className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-8 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-card hover:shadow-elevation btn-press"
                 >
                   Add Entry
                 </button>
