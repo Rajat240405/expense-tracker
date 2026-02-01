@@ -16,6 +16,26 @@ import { format, parse } from 'date-fns';
 
 const PREDEFINED_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Other'];
 
+// Category icon mapping
+const CATEGORY_ICONS: { [key: string]: string } = {
+  'Food': '🍔',
+  'Travel': '✈️',
+  'Shopping': '🛍️',
+  'Bills': '📄',
+  'Entertainment': '🎬',
+  'Health': '💊',
+  'Transport': '🚗',
+  'Education': '📚',
+  'Groceries': '🛒',
+  'Utilities': '💡',
+  'Other': '📌'
+};
+
+// Helper to get category icon
+const getCategoryIcon = (category: string): string => {
+  return CATEGORY_ICONS[category] || '📌'; // Default to pin icon
+};
+
 // Currency options
 const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'Dollar' },
@@ -980,7 +1000,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                    flex-shrink-0 px-2.5 py-1 rounded text-xs font-semibold tracking-wide
                                    ${getCategoryColor(expense.category)}
                                  `}>
-                                            {expense.category}
+                                            <span className="mr-1.5">{getCategoryIcon(expense.category)}</span>{expense.category}
                                           </span>
                                           <div className="flex-1 min-w-0">
                                             <span className="block text-base text-[#37352f] dark:text-gray-100 line-clamp-1 break-words">
@@ -1251,133 +1271,133 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         className="md:hidden fixed bottom-6 right-6 z-40 w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-elevation flex items-center justify-center btn-press transition-smooth"
         title="Add Expense"
       >
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-      </svg>
-    </button>
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
 
-      {/* FAB Modal - Mobile Bottom Sheet */ }
-  {
-    isFabModalOpen && (
-      <div
-        className="md:hidden fixed inset-0 z-50 flex items-end"
-        onClick={() => setIsFabModalOpen(false)}
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn" />
+      {/* FAB Modal - Mobile Bottom Sheet */}
+      {
+        isFabModalOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-50 flex items-end"
+            onClick={() => setIsFabModalOpen(false)}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn" />
 
-        {/* Bottom Sheet */}
-        <div
-          className="relative w-full max-h-[90vh] overflow-y-auto glass-card rounded-t-3xl p-6 shadow-elevation animate-slideUp"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Handle */}
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-          </div>
-
-          {/* Title */}
-          <h2 className="text-2xl font-bold text-[#37352f] dark:text-gray-100 mb-6">Add Expense</h2>
-
-          {/* Form - Reuse the same form from desktop */}
-          <form onSubmit={(e) => { addExpense(e); setIsFabModalOpen(false); }} className="flex flex-col gap-6">
-            <div className="grid grid-cols-1 gap-5">
-
-              {/* Date */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Date</label>
-                <button
-                  type="button"
-                  onClick={() => setIsDatePickerOpen(true)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
-                >
-                  <span>{new Date(dateInput).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Amount */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth tabular-nums"
-                  autoFocus
-                  required
-                />
-              </div>
-
-              {/* Currency */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Currency</label>
-                <button
-                  type="button"
-                  onClick={() => setIsCurrencyPickerOpen(true)}
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth"
-                >
-                  <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Category</label>
-                {isCustomCategory ? (
-                  <input
-                    type="text"
-                    value={customCategoryInput}
-                    onChange={(e) => setCustomCategoryInput(e.target.value)}
-                    placeholder="Type custom category..."
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-blue-500 rounded-xl text-sm text-[#37352f] dark:text-gray-100 outline-none ring-2 ring-blue-200 dark:ring-blue-900"
-                    autoFocus
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsCategorySelectorOpen(true)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
-                  >
-                    <span>{category}</span>
-                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-
-              {/* Note */}
-              <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Note</label>
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Description (optional)"
-                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-smooth"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-8 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-card hover:shadow-elevation btn-press"
+            {/* Bottom Sheet */}
+            <div
+              className="relative w-full max-h-[90vh] overflow-y-auto glass-card rounded-t-3xl p-6 shadow-elevation animate-slideUp"
+              onClick={(e) => e.stopPropagation()}
             >
-              Add Entry
-            </button>
-          </form>
-        </div>
-      </div>
-    )
-  }
+              {/* Handle */}
+              <div className="flex justify-center mb-4">
+                <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl font-bold text-[#37352f] dark:text-gray-100 mb-6">Add Expense</h2>
+
+              {/* Form - Reuse the same form from desktop */}
+              <form onSubmit={(e) => { addExpense(e); setIsFabModalOpen(false); }} className="flex flex-col gap-6">
+                <div className="grid grid-cols-1 gap-5">
+
+                  {/* Date */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Date</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsDatePickerOpen(true)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
+                    >
+                      <span>{new Date(dateInput).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Amount */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth tabular-nums"
+                      autoFocus
+                      required
+                    />
+                  </div>
+
+                  {/* Currency */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Currency</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCurrencyPickerOpen(true)}
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth"
+                    >
+                      <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
+                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Category */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Category</label>
+                    {isCustomCategory ? (
+                      <input
+                        type="text"
+                        value={customCategoryInput}
+                        onChange={(e) => setCustomCategoryInput(e.target.value)}
+                        placeholder="Type custom category..."
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-blue-500 rounded-xl text-sm text-[#37352f] dark:text-gray-100 outline-none ring-2 ring-blue-200 dark:ring-blue-900"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsCategorySelectorOpen(true)}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
+                      >
+                        <span>{category}</span>
+                        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Note */}
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Note</label>
+                    <input
+                      type="text"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Description (optional)"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-smooth"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-8 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-card hover:shadow-elevation btn-press"
+                >
+                  Add Entry
+                </button>
+              </form>
+            </div>
+          </div>
+        )
+      }
 
     </div >
   );
@@ -1425,3 +1445,4 @@ function getCategoryColor(category: string): string {
 }
 
 export default Workspace;
+
