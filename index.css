@@ -2,16 +2,308 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles */
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+/* ===================================
+   KIMI UI - CUSTOM THEME
+   Premium Finance App Design System
+   =================================== */
+
+/* CSS Custom Properties for Dynamic Theming */
+:root {
+  /* Primary Brand Color (HSL-based for harmony) */
+  --color-primary: 220 80% 55%;
+  --color-primary-dark: 220 70% 45%;
+  --color-primary-light: 220 85% 65%;
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-bg-dark: rgba(10, 10, 10, 0.8);
+  --glass-blur: 10px;
+  
+  /* Premium Shadows */
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-elevation: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.4);
+  
+  /* Animation Timing */
+  --transition-fast: 150ms;
+  --transition-base: 300ms;
+  --transition-slow: 500ms;
+  --ease-smooth: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Base Styles */
+* {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-variant-numeric: tabular-nums; /* Tabular numbers for financial data */
+}
+
 #root {
   min-height: 100vh;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ===================================
+   UTILITY CLASSES
+   =================================== */
+
+/* Glassmorphism Effects */
+@layer utilities {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+  
+  .dark .glass {
+    background: var(--glass-bg-dark);
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .dark .glass-card {
+    background: rgba(20, 20, 20, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Tabular Numbers for Amounts */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Custom Shadows */
+  .shadow-subtle {
+    box-shadow: var(--shadow-subtle);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .shadow-elevation {
+    box-shadow: var(--shadow-elevation);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: all var(--transition-base) var(--ease-smooth);
+  }
+  
+  .transition-bounce {
+    transition: all var(--transition-base) var(--ease-bounce);
+  }
+}
+
+/* ===================================
+   ANIMATIONS & KEYFRAMES
+   =================================== */
+
+/* Modal Entrance Animation */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Bottom Sheet Slide Up */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade In Stagger (for list items) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse Glow (for budget warning) */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+  }
+}
+
+/* Skeleton Loading Shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Animation Utility Classes */
+@layer utilities {
+  .animate-modal-enter {
+    animation: modalEnter var(--transition-base) var(--ease-smooth);
+  }
+  
+  .animate-slide-up {
+    animation: slideUp var(--transition-base) var(--ease-smooth);
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn var(--transition-base) var(--ease-smooth);
+  }
+  
+  .animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+  
+  /* Stagger delay utilities */
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+}
+
+/* ===================================
+   COMPONENT STYLES
+   =================================== */
+
+/* Premium Button Press Effect */
+@layer components {
+  .btn-press {
+    transition: transform var(--transition-fast) var(--ease-smooth);
+  }
+  
+  .btn-press:active {
+    transform: scale(0.98);
+  }
+  
+  /* Card Hover Lift */
+  .card-hover {
+    transition: all var(--transition-base) var(--ease-smooth);
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elevation);
+  }
+}
+
+/* ===================================
+   ACCESSIBILITY & PREFERENCES
+   =================================== */
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus Visible Styles (Keyboard Navigation) */
+:focus-visible {
+  outline: 2px solid hsl(var(--color-primary));
+  outline-offset: 2px;
+}
+
+/* ===================================
+   GRADIENT BACKGROUNDS
+   =================================== */
+
+@layer utilities {
+  .bg-gradient-premium {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  }
+  
+  .dark .bg-gradient-premium {
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+  }
+  
+  .bg-gradient-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(249,250,251,0.9) 100%);
+  }
+  
+  .dark .bg-gradient-card {
+    background: linear-gradient(135deg, rgba(20,20,20,0.9) 0%, rgba(30,30,40,0.9) 100%);
+  }
+}
+
+/* ===================================
+   DARK MODE ENHANCEMENTS
+   =================================== */
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Deep black backgrounds for dark mode */
+.dark body {
+  background-color: #0a0a0a;
+}
+
+/* ===================================
+   SKELETON LOADING STATES
+   =================================== */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(200, 200, 200, 0.1) 0%,
+    rgba(200, 200, 200, 0.3) 50%,
+    rgba(200, 200, 200, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(50, 50, 50, 0.1) 0%,
+    rgba(50, 50, 50, 0.3) 50%,
+    rgba(50, 50, 50, 0.1) 100%
+  );
+  background-size: 200% 100%;
 }
