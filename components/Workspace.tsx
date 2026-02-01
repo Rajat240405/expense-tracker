@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Expense, CustomCurrency, WorkspaceView } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { DataSyncService } from '../services/DataSyncService';
@@ -19,9 +19,9 @@ const PREDEFINED_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Other'];
 // Currency options
 const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'Dollar' },
-  { code: 'INR', symbol: '₹', name: 'Rupees' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'Pound' },
+  { code: 'INR', symbol: 'â‚¹', name: 'Rupees' },
+  { code: 'EUR', symbol: 'â‚¬', name: 'Euro' },
+  { code: 'GBP', symbol: 'Â£', name: 'Pound' },
 ];
 
 // Helper to get currency symbol - supports custom currencies
@@ -137,6 +137,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [hasCheckedMigration, setHasCheckedMigration] = useState(false);
+
+  // FAB Modal State (mobile only)
+  const [isFabModalOpen, setIsFabModalOpen] = useState(false);
 
   // --- PERSISTENCE ---
   // Load data based on auth state
@@ -730,8 +733,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         />
       ) : (
         <>
-          {/* Add Expense Form */}
-          <div className="mb-14 glass-card rounded-2xl p-6 shadow-card transition-smooth hover:shadow-elevation">
+          {/* Add Expense Form - Desktop: Inline, Mobile: Hidden (FAB triggers modal) */}
+          <div className="hidden md:block mb-14 glass-card rounded-2xl p-6 shadow-card transition-smooth hover:shadow-elevation">
             <form onSubmit={addExpense} className="flex flex-col gap-6">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
 
@@ -837,7 +840,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {Object.keys(groupedExpenses).length === 0 ? (
               <div className="text-center py-20 px-6">
                 <div className="max-w-sm mx-auto">
-                  <div className="text-6xl mb-4">📝</div>
+                  <div className="text-6xl mb-4">ðŸ“</div>
                   <h3 className="text-lg font-semibold text-[#37352f] dark:text-gray-100 mb-2">
                     No expenses for {viewDate.toLocaleDateString('en-US', { month: 'long' })}
                   </h3>
@@ -848,7 +851,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
-                    <span>Track · Budget · Save</span>
+                    <span>Track Â· Budget Â· Save</span>
                   </div>
                 </div>
               </div>
@@ -915,7 +918,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                     <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
                                       {formatShortDate(date)}
                                     </span>
-                                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                                    <span className="text-gray-300 dark:text-gray-600">â€¢</span>
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       {Object.entries(dateTotals).map(([curr, amount]) => (
                                         <span key={curr} className="text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -957,7 +960,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                           </button>
                                           <div className="flex gap-2">
                                             <button onClick={saveEdit} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors">Save</button>
-                                            <button onClick={cancelEdit} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-sm px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">✕</button>
+                                            <button onClick={cancelEdit} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-sm px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">âœ•</button>
                                           </div>
                                         </div>
                                         <textarea
@@ -1242,7 +1245,141 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         onClose={() => setIsBudgetCurrencyPickerOpen(false)}
       />
 
-    </div>
+      {/* FAB (Floating Action Button) - Mobile Only */}
+      <button
+        onClick={() => setIsFabModalOpen(true)}
+        className="md:hidden fixed bottom-6 right-6 z-40 w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-elevation flex items-center justify-center btn-press transition-smooth"
+        title="Add Expense"
+      >
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+      </svg>
+    </button>
+
+      {/* FAB Modal - Mobile Bottom Sheet */ }
+  {
+    isFabModalOpen && (
+      <div
+        className="md:hidden fixed inset-0 z-50 flex items-end"
+        onClick={() => setIsFabModalOpen(false)}
+      >
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn" />
+
+        {/* Bottom Sheet */}
+        <div
+          className="relative w-full max-h-[90vh] overflow-y-auto glass-card rounded-t-3xl p-6 shadow-elevation animate-slideUp"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Handle */}
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+          </div>
+
+          {/* Title */}
+          <h2 className="text-2xl font-bold text-[#37352f] dark:text-gray-100 mb-6">Add Expense</h2>
+
+          {/* Form - Reuse the same form from desktop */}
+          <form onSubmit={(e) => { addExpense(e); setIsFabModalOpen(false); }} className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 gap-5">
+
+              {/* Date */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Date</label>
+                <button
+                  type="button"
+                  onClick={() => setIsDatePickerOpen(true)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
+                >
+                  <span>{new Date(dateInput).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth tabular-nums"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {/* Currency */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Currency</label>
+                <button
+                  type="button"
+                  onClick={() => setIsCurrencyPickerOpen(true)}
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-smooth"
+                >
+                  <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
+                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Category</label>
+                {isCustomCategory ? (
+                  <input
+                    type="text"
+                    value={customCategoryInput}
+                    onChange={(e) => setCustomCategoryInput(e.target.value)}
+                    placeholder="Type custom category..."
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-blue-500 rounded-xl text-sm text-[#37352f] dark:text-gray-100 outline-none ring-2 ring-blue-200 dark:ring-blue-900"
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCategorySelectorOpen(true)}
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-500 transition-smooth focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none"
+                  >
+                    <span>{category}</span>
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold mb-2.5 ml-1">Note</label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Description (optional)"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-[#37352f] dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none placeholder-gray-300 dark:placeholder-gray-600 transition-smooth"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="bg-[#2383e2] hover:bg-[#1d70c2] text-white px-8 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-card hover:shadow-elevation btn-press"
+            >
+              Add Entry
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+    </div >
   );
 };
 
