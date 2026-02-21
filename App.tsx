@@ -1,50 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { ViewState } from './types';
+import React from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { GroupProvider } from './contexts/GroupContext';
 import Landing from './components/Landing';
 import Workspace from './components/Workspace';
-import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+import JoinGroupPage from './pages/JoinGroupPage';
+
+function LandingRoute() {
+  const navigate = useNavigate();
+  return <Landing onEnter={() => navigate('/workspace')} />;
+}
+
+function WorkspaceRoute() {
+  const navigate = useNavigate();
+  return <Workspace onBack={() => navigate('/')} />;
+}
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewState>('landing');
-  const [isDark, setIsDark] = useState(false);
-
-  // Sync with device theme
-  useEffect(() => {
-    // Check system preference
-    const checkTheme = () => {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setIsDark(prefersDark);
-      
-      // Apply dark class to html element
-      if (prefersDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-
-    // Initial check
-    checkTheme();
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => checkTheme();
-    
-    mediaQuery.addEventListener('change', handleChange);
-    
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
   return (
-    <AuthProvider>
-      <div className="min-h-screen w-full bg-white dark:bg-gray-900 text-[#37352f] dark:text-gray-100 transition-colors">
-        {currentView === 'landing' ? (
-          <Landing onEnter={() => setCurrentView('workspace')} />
-        ) : (
-          <Workspace onBack={() => setCurrentView('landing')} />
-        )}
-      </div>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <GroupProvider>
+          <div className="min-h-screen w-full bg-[#080c14] text-gray-100">
+            <Routes>
+              <Route path="/" element={<LandingRoute />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
+              <Route path="/join/:token" element={<JoinGroupPage />} />
+              <Route
+                path="/workspace"
+                element={
+                  <ProtectedRoute>
+                    <WorkspaceRoute />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<LandingRoute />} />
+            </Routes>
+          </div>
+        </GroupProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
