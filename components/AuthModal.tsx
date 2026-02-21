@@ -35,7 +35,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
     setError('');
     setLoading(true);
 
-    const { error } = mode === 'signin'
+    const { error } = mode === 'signin' 
       ? await signIn(email, password)
       : await signUp(email, password);
 
@@ -46,7 +46,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
     } else {
       if (mode === 'signup') {
         setError('Account created! Check your email to confirm, then sign in.');
-        setTimeout(() => { onClose(); setEmail(''); setPassword(''); setError(''); }, 4000);
+        setTimeout(() => {
+          onClose();
+          setEmail('');
+          setPassword('');
+          setError('');
+        }, 4000);
       } else {
         onSuccess?.();
         onClose();
@@ -58,7 +63,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" onClick={onClose} />
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div className="bg-[#0f1520] border border-white/[0.09] rounded-2xl shadow-2xl max-w-md w-full p-7 pointer-events-auto animate-slideUp">
 
@@ -72,14 +83,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                 {mode === 'signin' ? 'Sign in to sync your expenses' : 'Optional — sync across devices'}
               </p>
             </div>
-            <button onClick={onClose} title="Close" className="text-gray-500 hover:text-gray-300 p-1 rounded-lg hover:bg-white/[0.07] transition-colors">
+            <button
+              onClick={onClose}
+              title="Close"
+              className="text-gray-500 hover:text-gray-300 p-1 rounded-lg hover:bg-white/[0.07] transition-colors"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          {/* Google */}
+          {/* Google Button */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -106,7 +121,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             <div className="flex-1 h-px bg-white/[0.08]" />
           </div>
 
-          {/* Form */}
+          {/* Email / Password Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
@@ -119,6 +134,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                 placeholder="your@email.com"
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
               <input
@@ -151,6 +167,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             </button>
           </form>
 
+          {/* Toggle mode */}
           <div className="mt-4 text-center">
             <button
               onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }}
@@ -160,6 +177,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             </button>
           </div>
 
+          {/* Guest note */}
           <div className="mt-5 p-3 bg-white/[0.04] rounded-xl">
             <p className="text-xs text-gray-500 text-center">
               Expenses are saved locally by default. Sign in only to enable cloud sync.
@@ -170,10 +188,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
       <style>{`
         @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-        .animate-slideUp { animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .animate-slideUp {
+          animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
       `}</style>
     </>
   );

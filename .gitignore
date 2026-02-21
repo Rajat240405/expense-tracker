@@ -37,7 +37,7 @@ android/.gradle/
 android/local.properties
 
 # Sensitive Android files — contains keystore passwords, never commit
-# android/gradle.properties  # removed from ignore — only contains build settings
+android/gradle.properties
 
 # iOS (not used in this project)
 ios/

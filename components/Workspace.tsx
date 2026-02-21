@@ -4,9 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { DataSyncService } from '../services/DataSyncService';
 import AuthModal from './AuthModal';
 import MigrationModal from './MigrationModal';
-import Splits from './Splits';
+import GroupList from './groups/GroupList';
+import GroupDashboard from './groups/GroupDashboard';
 import Visualize from './Visualize';
 import BottomNav from './BottomNav';
+import ProfileView from './profile/ProfileView';
+import DirectSplitsView from './home/DirectSplitsView';
+import { useGroups } from '../contexts/GroupContext';
+import { AppMode, HomeTab } from '../types';
+import { exportGroupsAsJSON, exportGroupsAsCSV, exportPersonalExpensesAsCSV } from '../lib/exportService';
 import LineChartMonthly from './charts/LineChartMonthly';
 import DonutChartCategories from './charts/DonutChartCategories';
 import BudgetProgress from './charts/BudgetProgress';
@@ -102,7 +108,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
   // View State
   const [viewDate, setViewDate] = useState(new Date()); // For tracking current month view
-  const [activeView, setActiveView] = useState<WorkspaceView>('expenses');
+  const [appMode, setAppMode]   = useState<AppMode>('home');
+  const [homeTab, setHomeTab]   = useState<HomeTab>('personal');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  // Groups data (from context) — renamed to avoid collision with groupedExpenses local var
+  const { groups: allGroups, groupExpenses: allGroupExpenses, settlements: allSettlements } = useGroups();
 
   // Add Form State
   const [amount, setAmount] = useState<string>('');
@@ -552,29 +563,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   }, [onBack]);
 
 
+  // Export handler — supports JSON/CSV download for groups + personal expenses
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
   const handleDownload = useCallback(() => {
-    if (!expenses.length) return;
-    const header = ['Date', 'Amount', 'Currency', 'Category', 'Note'];
-    const rows = expenses.map((ex) => [
-      ex.date,
-      ex.amount.toFixed(2),
-      ex.currency || 'INR',
-      ex.category,
-      `"${(ex.note || '').replace(/"/g, '""')}"`,
-    ]);
-    const csv = [header, ...rows].map((r) => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [expenses]);
+    setIsExportModalOpen(true);
+  }, []);
 
   return (
     <div className="relative min-h-screen">
-      {/* Ambient glow */}
+      {/* Ambient glow — identical to landing page */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-blue-600/20 blur-[120px]" />
         <div className="absolute top-1/3 -left-32 w-[400px] h-[400px] rounded-full bg-indigo-700/15 blur-[100px]" />
@@ -711,13 +709,40 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         </div>
       )}
 
+      {/* Home Tab Bar — shown only when in Home mode */}
+      {appMode === 'home' && (
+        <div className="flex gap-0 mb-6 border-b border-white/[0.08]">
+          {(['personal', 'splits', 'analytics'] as HomeTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setHomeTab(tab)}
+              className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+                homeTab === tab
+                  ? 'border-blue-400 text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-200'
+              }`}
+            >
+              {tab === 'personal' ? '📝 Personal' : tab === 'splits' ? '🤝 Splits' : '📊 Analytics'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Conditional View Rendering */}
-      {activeView === 'splits' ? (
-        <Splits
-          customCurrencies={customCurrencies}
-          getCurrencySymbol={(code) => getCurrencySymbol(code, customCurrencies)}
-        />
-      ) : activeView === 'visualize' ? (
+      {appMode === 'profile' ? (
+        <ProfileView />
+      ) : appMode === 'groups' ? (
+        selectedGroupId ? (
+          <GroupDashboard
+            groupId={selectedGroupId}
+            onBack={() => setSelectedGroupId(null)}
+          />
+        ) : (
+          <GroupList onSelectGroup={(id) => setSelectedGroupId(id)} />
+        )
+      ) : homeTab === 'splits' ? (
+        <DirectSplitsView />
+      ) : homeTab === 'analytics' ? (
         <Visualize
           expenses={expenses}
           budget={budget}
@@ -728,7 +753,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       ) : (
         <>
           {/* Add Expense Form */}
-          <div className="mb-12 border border-white/[0.09] rounded-lg p-5 bg-white/[0.04] backdrop-blur-sm shadow-sm transition-all hover:shadow-md">
+          <div className="mb-12 border border-white/[0.09] rounded-xl p-5 bg-white/[0.04] backdrop-blur-sm transition-all hover:bg-white/[0.06]">
             <form onSubmit={addExpense} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
 
@@ -738,7 +763,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                   <button
                     type="button"
                     onClick={() => setIsDatePickerOpen(true)}
-                    className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 text-left flex items-center justify-between hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                    className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 text-left flex items-center justify-between hover:border-white/[0.20] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
                   >
                     <span>{formatDateDisplay(dateInput)}</span>
                     <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -750,7 +775,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 {/* Amount */}
                 <div className="md:col-span-2">
                   <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 ml-1">Amount</label>
-                  <div className="flex items-center bg-white/[0.07] border border-white/[0.12] rounded hover:border-white/20 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
+                  <div className="flex items-center bg-white/[0.07] border border-white/[0.12] rounded hover:border-white/[0.20] focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-colors">
                     <span className="pl-3 text-gray-400 text-sm font-medium">{getCurrencySymbol(currency, customCurrencies)}</span>
                     <input
                       type="number"
@@ -771,7 +796,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                   <button
                     type="button"
                     onClick={() => setIsCurrencyPickerOpen(true)}
-                    className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 text-left flex items-center justify-between hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
+                    className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 text-left flex items-center justify-between hover:border-white/[0.20] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors"
                   >
                     <span>{getCurrencySymbol(currency, customCurrencies)} {CURRENCIES.find(c => c.code === currency)?.name || customCurrencies.find(c => c.code === currency)?.name || currency}</span>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -796,7 +821,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                     <button
                       type="button"
                       onClick={() => setIsCategorySelectorOpen(true)}
-                      className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 text-left flex items-center justify-between hover:border-white/20 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 text-left flex items-center justify-between hover:border-white/[0.20] transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                     >
                       <span>{category}</span>
                       <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -814,7 +839,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Description (optional)"
-                    className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-600 transition-colors"
+                    className="w-full px-3 py-2.5 bg-white/[0.07] border border-white/[0.12] rounded text-sm text-gray-100 hover:border-white/[0.20] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-600 transition-colors"
                   />
                 </div>
               </div>
@@ -877,7 +902,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                       {dateGroupTotalsByCurrency[dateLabel] && Object.keys(dateGroupTotalsByCurrency[dateLabel]).length > 0 && (
                         <div className="flex items-center gap-2 flex-wrap justify-end">
                           {Object.entries(dateGroupTotalsByCurrency[dateLabel]).map(([curr, amount]) => (
-                            <span key={curr} className="text-sm font-bold text-white bg-blue-500/15 px-3 py-1 rounded-full border border-blue-500/25">
+                            <span key={curr} className="text-sm font-bold text-blue-300 bg-blue-500/15 px-3 py-1 rounded-full border border-blue-500/25">
                               {getCurrencySymbol(curr, customCurrencies)}{amount.toFixed(2)}
                             </span>
                           ))}
@@ -909,7 +934,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                 <div className="flex items-center gap-3 my-4 first:mt-0">
                                   <div className="flex-1 h-px bg-white/[0.08]"></div>
                                   <div className="flex items-center gap-2 px-2">
-                                    <span className="text-xs font-medium text-gray-400">
+                                    <span className="text-xs font-medium text-gray-500">
                                       {formatShortDate(date)}
                                     </span>
                                     <span className="text-gray-600">•</span>
@@ -921,7 +946,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                       ))}
                                     </div>
                                   </div>
-                                  <div className="flex-1 h-px bg-white/[0.08]"></div>
+<div className="flex-1 h-px bg-white/[0.08]"></div>
                                 </div>
 
                                 {/* Expenses for this date */}
@@ -939,13 +964,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                               type="number"
                                               value={editForm.amount}
                                               onChange={e => setEditForm(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
-                                              className="w-full p-2.5 border border-blue-400 rounded-lg text-sm bg-white/[0.07] text-gray-100 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                                              className="w-full p-2.5 border border-blue-500/60 rounded-lg text-sm bg-white/[0.08] text-white focus:ring-2 focus:ring-blue-400/50 focus:outline-none"
                                               autoFocus
                                             />
                                           </div>
                                           <button
                                             onClick={() => setIsEditCategorySelectorOpen(true)}
-                                            className="flex-1 p-2.5 border border-blue-400 rounded-lg text-sm bg-white/[0.07] text-gray-100 hover:bg-white/[0.12] transition-colors text-left font-medium flex items-center justify-between"
+                                            className="flex-1 p-2.5 border border-blue-500/60 rounded-lg text-sm bg-white/[0.08] text-white hover:bg-white/[0.12] transition-colors text-left font-medium flex items-center justify-between"
                                           >
                                             <span>{editForm.category}</span>
                                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -953,15 +978,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                             </svg>
                                           </button>
                                           <div className="flex gap-2">
-                                            <button onClick={saveEdit} className="text-green-400 hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-900/30 transition-colors">Save</button>
-                                            <button onClick={cancelEdit} className="text-gray-400 hover:text-gray-200 text-sm px-2 py-2 rounded-lg hover:bg-white/[0.08] transition-colors">✕</button>
+                                            <button onClick={saveEdit} className="text-green-400 hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-900/20 transition-colors">Save</button>
+                                            <button onClick={cancelEdit} className="text-gray-500 hover:text-gray-300 text-sm px-2 py-2 rounded-lg hover:bg-white/[0.08] transition-colors">✕</button>
                                           </div>
                                         </div>
                                         <textarea
                                           value={editForm.note || ''}
                                           onChange={e => setEditForm(prev => ({ ...prev, note: e.target.value }))}
                                           placeholder="Add a description..."
-                                          className="w-full p-3 border border-blue-400 rounded-lg text-sm bg-white/[0.07] text-gray-100 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none leading-relaxed"
+                                          className="w-full p-3 border border-blue-500/60 rounded-lg text-sm bg-white/[0.08] text-white focus:ring-2 focus:ring-blue-400/50 focus:outline-none resize-none leading-relaxed"
                                           rows={3}
                                           style={{ minHeight: '90px' }}
                                         />
@@ -978,7 +1003,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                           </span>
                                           <div className="flex-1 min-w-0">
                                             <span className="block text-base text-gray-100 line-clamp-1 break-words">
-                                              {expense.note || <span className="text-gray-500 italic text-sm">No note</span>}
+                                              {expense.note || <span className="text-gray-600 italic text-sm">No note</span>}
                                             </span>
                                             {!expense.note && (
                                               <span className="block text-xs text-gray-500 mt-1">
@@ -1029,7 +1054,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 onClick={toggleBreakdown}
                 className="w-full flex items-center justify-between p-4 -mx-4 hover:bg-white/[0.04] rounded-lg transition-colors group"
               >
-                <h4 className="text-xs uppercase tracking-wider text-gray-400 font-bold">
+                <h4 className="text-xs uppercase tracking-wider text-gray-500 font-bold">
                   Breakdown ({viewDate.toLocaleDateString('en-US', { month: 'long' })})
                 </h4>
                 <svg
@@ -1116,7 +1141,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       {/* Undo Delete Snackbar */}
       {deletedExpense && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slideUpFade">
-          <div className="bg-[#0f1520] border border-white/[0.12] text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-4 min-w-[280px] max-w-[90vw]">
+          <div className="bg-[#37352f] text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-4 min-w-[280px] max-w-[90vw]">
             <div className="flex-1">
               <span className="text-sm font-medium">Expense deleted</span>
             </div>
@@ -1241,10 +1266,91 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
       {/* Bottom Navigation */}
       <BottomNav
-        activeView={activeView}
-        onViewChange={setActiveView}
-        onDownload={handleDownload}
+        activeMode={appMode}
+        onModeChange={(mode) => {
+          setAppMode(mode);
+          // Reset group drill-down when leaving groups
+          if (mode !== 'groups') setSelectedGroupId(null);
+        }}
       />
+
+      {/* Export Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setIsExportModalOpen(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative bg-[#0f1520] border border-white/[0.09] rounded-t-2xl w-full max-w-md p-6 pb-10 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-white mb-1">Export Data</h2>
+            <p className="text-sm text-gray-400 mb-5">Download your expense history</p>
+
+            <div className="space-y-3">
+              {/* Group exports */}
+              {allGroups.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Group Data</p>
+                  <button
+                    onClick={() => {
+                      exportGroupsAsJSON(allGroups, allGroupExpenses, allSettlements);
+                      setIsExportModalOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 rounded-xl transition-colors"
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold">All groups — JSON</p>
+                      <p className="text-xs opacity-70">Full data with members, expenses & settlements</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      exportGroupsAsCSV(allGroups, allGroupExpenses, allSettlements);
+                      setIsExportModalOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-green-500/10 hover:bg-green-500/20 text-green-300 rounded-xl transition-colors"
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold">All groups — CSV</p>
+                      <p className="text-xs opacity-70">Spreadsheet-friendly format</p>
+                    </div>
+                  </button>
+                </>
+              )}
+
+              {/* Personal expenses */}
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 pt-1">Personal Expenses</p>
+              <button
+                onClick={() => {
+                  exportPersonalExpensesAsCSV(expenses);
+                  setIsExportModalOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-gray-200 rounded-xl transition-colors"
+              >
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div className="text-left">
+                  <p className="text-sm font-semibold">Personal expenses — CSV</p>
+                  <p className="text-xs opacity-70">{expenses.length} expense{expenses.length !== 1 ? 's' : ''} total</p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setIsExportModalOpen(false)}
+              className="mt-4 w-full py-2.5 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
     </div>
