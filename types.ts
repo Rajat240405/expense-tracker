@@ -30,4 +30,4 @@ export interface CustomCurrency {
 
 export type ViewState = 'landing' | 'workspace';
 
-export type WorkspaceView = 'expenses' | 'splits';
+export type WorkspaceView = 'expenses' | 'splits' | 'visualize';

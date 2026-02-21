@@ -5,6 +5,8 @@ import { DataSyncService } from '../services/DataSyncService';
 import AuthModal from './AuthModal';
 import MigrationModal from './MigrationModal';
 import Splits from './Splits';
+import Visualize from './Visualize';
+import BottomNav from './BottomNav';
 import LineChartMonthly from './charts/LineChartMonthly';
 import DonutChartCategories from './charts/DonutChartCategories';
 import BudgetProgress from './charts/BudgetProgress';
@@ -550,8 +552,28 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   }, [onBack]);
 
 
+  const handleDownload = useCallback(() => {
+    if (!expenses.length) return;
+    const header = ['Date', 'Amount', 'Currency', 'Category', 'Note'];
+    const rows = expenses.map((ex) => [
+      ex.date,
+      ex.amount.toFixed(2),
+      ex.currency || 'INR',
+      ex.category,
+      `"${(ex.note || '').replace(/"/g, '""')}"`,
+    ]);
+    const csv = [header, ...rows].map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [expenses]);
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 font-sans">
+    <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 pb-28 font-sans">
 
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
@@ -688,41 +710,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* View Navigation Tabs */}
-      <div className="mb-8 flex gap-2 border-b border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => setActiveView('expenses')}
-          className={`px-4 py-3 text-sm font-semibold transition-all ${activeView === 'expenses'
-            ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-        >
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Expenses
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveView('splits')}
-          className={`px-4 py-3 text-sm font-semibold transition-all ${activeView === 'splits'
-            ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-        >
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Splits
-          </div>
-        </button>
-      </div>
-
       {/* Conditional View Rendering */}
       {activeView === 'splits' ? (
         <Splits
+          customCurrencies={customCurrencies}
+          getCurrencySymbol={(code) => getCurrencySymbol(code, customCurrencies)}
+        />
+      ) : activeView === 'visualize' ? (
+        <Visualize
+          expenses={expenses}
+          budget={budget}
+          budgetCurrency={budgetCurrency}
           customCurrencies={customCurrencies}
           getCurrencySymbol={(code) => getCurrencySymbol(code, customCurrencies)}
         />
@@ -1238,6 +1236,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
           setCustomCurrencies(prev => [...prev, newCurrency]);
         }}
         onClose={() => setIsBudgetCurrencyPickerOpen(false)}
+      />
+
+      {/* Bottom Navigation */}
+      <BottomNav
+        activeView={activeView}
+        onViewChange={setActiveView}
+        onDownload={handleDownload}
       />
 
     </div>
