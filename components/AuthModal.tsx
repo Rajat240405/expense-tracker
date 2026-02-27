@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -23,9 +24,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setError('');
+
+    // On native Capacitor (Android / iOS) `window.location.origin` resolves to
+    // the WebView's internal origin which Google/Supabase cannot redirect back to.
+    // We use the custom scheme `capacitor://localhost` instead, which Capacitor
+    // intercepts and routes back into the app.
+    // On web we derive the origin dynamically so it works across dev, staging and prod.
+    const redirectTo: string = Capacitor.isNativePlatform()
+      ? 'capacitor://localhost/auth/callback'
+      : `${window.location.origin}/auth/callback`;
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo },
     });
     setGoogleLoading(false);
   };

@@ -4,7 +4,17 @@
  * The inside-group view: expense list + balance summary + settlement history.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+
+// ── Invite URL base ────────────────────────────────────────────────────────
+// Priority: VITE_APP_URL env var → capacitor://localhost (native) → window.location.origin
+function getAppBaseUrl(): string {
+    const envUrl = import.meta.env.VITE_APP_URL as string | undefined;
+    if (envUrl) return envUrl.replace(/\/$/, '');
+    if (Capacitor.isNativePlatform()) return 'capacitor://localhost';
+    return window.location.origin;
+}
 import { Group, GroupExpense } from '../../types';
 import { useGroups } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -33,11 +43,36 @@ interface GroupDashboardProps {
 type InviteState = 'idle' | 'loading' | 'copied' | 'error';
 
 const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
-    const { getGroup, getGroupExpenses, getGroupSettlements, deleteGroupExpense, deleteSettlement } = useGroups();
+    const { getGroup, getGroupExpenses, getGroupSettlements, undoableDeleteGroupExpense, deleteSettlement } = useGroups();
     const { user, loading: authLoading } = useAuth();
     const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<DashboardTab>('expenses');
     const [inviteState, setInviteState] = useState<InviteState>('idle');
+
+    // ── Undo snackbar state ───────────────────────────────────────────────────
+    const [snackbar, setSnackbar] = useState<{ label: string; undo: () => void } | null>(null);
+    const snackbarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleDeleteExpense = useCallback((expenseId: string, description: string) => {
+        // Cancel any existing snackbar
+        if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current);
+
+        const { undo } = undoableDeleteGroupExpense(expenseId, 5000);
+
+        setSnackbar({
+            label: description ? `"${description}" deleted` : 'Expense deleted',
+            undo: () => {
+                undo();
+                setSnackbar(null);
+                if (snackbarTimerRef.current) clearTimeout(snackbarTimerRef.current);
+            },
+        });
+
+        snackbarTimerRef.current = setTimeout(() => {
+            setSnackbar(null);
+            snackbarTimerRef.current = null;
+        }, 5000);
+    }, [undoableDeleteGroupExpense]);
 
     const group = getGroup(groupId);
     const expenses = getGroupExpenses(groupId);
@@ -50,7 +85,7 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
         try {
             const result = await createInvite(group?.id ?? '');
             if ('error' in result) throw new Error(result.error);
-            const url = `${window.location.origin}/join/${result.token}`;
+            const url = `${getAppBaseUrl()}/join/${result.token}`;
             await navigator.clipboard.writeText(url);
             setInviteState('copied');
             setTimeout(() => setInviteState('idle'), 2000);
@@ -192,7 +227,7 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
                 <ExpenseList
                     expenses={expenses}
                     group={group}
-                    onDelete={deleteGroupExpense}
+                    onDelete={handleDeleteExpense}
                 />
             )}
             {activeTab === 'balances' && (
@@ -217,6 +252,38 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
                 onClose={() => setIsAddExpenseOpen(false)}
                 group={group}
             />
+
+            {/* Undo Delete Snackbar */}
+            {snackbar && (
+                <div className="fixed bottom-[calc(68px+env(safe-area-inset-bottom,0px)+12px)] left-1/2 -translate-x-1/2 z-50 animate-groupSnackbar">
+                    <div className="bg-gray-900 border border-white/10 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-4 min-w-[280px] max-w-[90vw] overflow-hidden">
+                        <span className="flex-1 text-sm font-medium truncate">{snackbar.label}</span>
+                        <button
+                            onClick={snackbar.undo}
+                            className="text-blue-400 hover:text-blue-300 font-semibold text-sm uppercase tracking-wide transition-colors shrink-0"
+                        >
+                            Undo
+                        </button>
+                        <span className="absolute bottom-0 left-0 h-[3px] bg-blue-500 rounded-b-xl animate-snackbarCountdown" />
+                    </div>
+                </div>
+            )}
+            <style>{`
+                @keyframes groupSnackbar {
+                    from { opacity: 0; transform: translate(-50%, 16px); }
+                    to   { opacity: 1; transform: translate(-50%, 0);    }
+                }
+                .animate-groupSnackbar {
+                    animation: groupSnackbar 0.28s cubic-bezier(0.34,1.56,0.64,1);
+                }
+                @keyframes snackbarCountdown {
+                    from { width: 100%; }
+                    to   { width: 0%;   }
+                }
+                .animate-snackbarCountdown {
+                    animation: snackbarCountdown 5s linear forwards;
+                }
+            `}</style>
         </div>
     );
 };
@@ -226,14 +293,18 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
 interface ExpenseListProps {
     expenses: GroupExpense[];
     group: Group;
-    onDelete: (id: string) => void;
+    onDelete: (id: string, description: string) => void;
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, group, onDelete }) => {
     if (expenses.length === 0) {
         return (
             <div className="text-center py-16 text-gray-400">
-                <div className="text-4xl mb-3">🧾</div>
+                <div className="flex justify-center mb-3">
+                    <svg className="w-12 h-12 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
                 <p className="text-base font-medium text-gray-500 dark:text-gray-400">No expenses yet</p>
                 <p className="text-sm mt-1">Tap "Add" to record the first expense.</p>
             </div>
@@ -279,7 +350,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, group, onDelete }) 
                                             <p className="text-xs text-gray-400 capitalize">{expense.splitType}</p>
                                         </div>
                                         <button
-                                            onClick={() => onDelete(expense.id)}
+                                            onClick={() => onDelete(expense.id, expense.description)}
                                             className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors"
                                             aria-label="Delete expense"
                                         >

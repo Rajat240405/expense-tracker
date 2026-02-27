@@ -206,7 +206,9 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ isOpen, onClose, on
                                     {/* "You" row — always present and non-removable */}
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-                                            <span className="text-blue-600 dark:text-blue-400 text-sm">👤</span>
+                                            <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
                                             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                                                 You (always included)
                                             </span>

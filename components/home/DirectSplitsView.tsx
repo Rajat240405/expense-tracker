@@ -1,45 +1,38 @@
 /**
  * DirectSplitsView.tsx
  *
- * Scaffold for 1-to-1 split sessions (non-group).
- * Two users share a persistent split session and track who paid what.
- * Full implementation to follow; structure is production-ready.
+ * 1-to-1 split sessions — available to both authenticated and guest users.
+ *
+ * Authenticated users: data synced to Supabase via directSplitService.
+ * Guest users: data stored in localStorage via guestDirectSplitService.
+ *
+ * The correct backend is selected transparently by useDirectSplitService().
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import * as Svc from '../../lib/directSplitService';
+import { useDirectSplitService } from '../../lib/useDirectSplitService';
 import type { DirectSplit, DirectExpense } from '../../types';
 
 const DirectSplitsView: React.FC = () => {
-    const { user } = useAuth();
+    const svc = useDirectSplitService();
     const [splits, setSplits] = useState<DirectSplit[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
-        if (!user) return;
         setLoading(true);
         setError(null);
         try {
-            const data = await Svc.fetchDirectSplits();
+            const data = await svc.fetchDirectSplits();
             setSplits(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load splits');
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [svc]);
 
     useEffect(() => { void load(); }, [load]);
-
-    if (!user) {
-        return (
-            <div className="py-20 text-center text-gray-500 dark:text-gray-400">
-                Sign in to use 1-to-1 splits.
-            </div>
-        );
-    }
 
     if (loading) {
         return (
@@ -51,6 +44,19 @@ const DirectSplitsView: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            {/* Guest banner */}
+            {svc.isGuest && (
+                <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl text-sm text-amber-800 dark:text-amber-300">
+                    <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>
+                        You are browsing as a guest. Splits are saved locally on this device.{' '}
+                        <strong>Sign in</strong> to sync across devices.
+                    </span>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -81,7 +87,11 @@ const DirectSplitsView: React.FC = () => {
             {/* Empty state */}
             {splits.length === 0 && !error && (
                 <div className="py-20 text-center">
-                    <div className="text-5xl mb-4">🤝</div>
+                    <div className="flex justify-center mb-4">
+                        <svg className="w-14 h-14 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
                         No active splits
                     </h3>
@@ -97,11 +107,12 @@ const DirectSplitsView: React.FC = () => {
                     <SplitCard
                         key={split.id}
                         split={split}
-                        currentUserId={user.id}
+                        currentUserId={svc.currentUserId}
+                        fetchExpenses={svc.fetchDirectExpenses}
                         onDelete={() => {
-                            Svc.deleteDirectSplit(split.id)
+                            svc.deleteDirectSplit(split.id)
                                 .then(load)
-                                .catch((e) => setError(e.message));
+                                .catch((e: Error) => setError(e.message));
                         }}
                     />
                 ))}
@@ -115,10 +126,11 @@ const DirectSplitsView: React.FC = () => {
 interface SplitCardProps {
     split: DirectSplit;
     currentUserId: string;
+    fetchExpenses: (splitId: string) => Promise<DirectExpense[]>;
     onDelete: () => void;
 }
 
-const SplitCard: React.FC<SplitCardProps> = ({ split, currentUserId, onDelete }) => {
+const SplitCard: React.FC<SplitCardProps> = ({ split, currentUserId, fetchExpenses, onDelete }) => {
     const [expenses, setExpenses] = useState<DirectExpense[]>([]);
     const [expanded, setExpanded] = useState(false);
     const [loadingExpenses, setLoadingExpenses] = useState(false);
@@ -130,7 +142,7 @@ const SplitCard: React.FC<SplitCardProps> = ({ split, currentUserId, onDelete })
         setExpanded(true);
         setLoadingExpenses(true);
         try {
-            const data = await Svc.fetchDirectExpenses(split.id);
+            const data = await fetchExpenses(split.id);
             setExpenses(data);
         } finally {
             setLoadingExpenses(false);

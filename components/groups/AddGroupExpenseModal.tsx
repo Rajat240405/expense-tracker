@@ -288,7 +288,7 @@ const AddGroupExpenseModal: React.FC<AddGroupExpenseModalProps> = ({ isOpen, onC
                                                     : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
                                                     }`}
                                             >
-                                                {type === 'equal' ? '⚖️ Equal' : type === 'unequal' ? '✏️ Custom' : '% Percent'}
+                                                {type === 'equal' ? 'Equal' : type === 'unequal' ? 'Custom' : '% Percent'}
                                             </button>
                                         ))}
                                     </div>

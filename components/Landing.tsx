@@ -1,45 +1,11 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import AuthModal from './AuthModal';
 import { supabase } from '../lib/supabase';
 
 interface LandingProps {
   onEnter: () => void;
 }
-
-// ─── Feature card data ────────────────────────────────────────────────────────
-
-const FEATURES = [
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75"
-          d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
-    title: 'Personal Expenses',
-    description: 'Log daily spending with categories, dates, and notes. See where every rupee goes.',
-  },
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75"
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-    title: 'Split with Friends',
-    description: 'Create groups, add shared expenses, and auto-calculate who owes whom with simplified settlements.',
-  },
-  {
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75"
-          d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
-    title: 'Real-time Sync',
-    description: 'Changes appear instantly across all devices and group members. No refresh needed.',
-  },
-];
 
 // ─── Google Icon ──────────────────────────────────────────────────────────────
 
@@ -61,15 +27,18 @@ const Landing: React.FC<LandingProps> = ({ onEnter }) => {
   const handleGoogleSignIn = async () => {
     if (googleLoading) return;
     setGoogleLoading(true);
+    const redirectTo = Capacitor.isNativePlatform()
+      ? 'capacitor://localhost/auth/callback'
+      : `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo },
     });
     // Page will redirect; no need to reset loading state.
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#080c14] text-white overflow-x-hidden">
+    <div className="bg-[#080c14] text-white overflow-x-hidden">
 
       {/* ── Ambient background glows ── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
@@ -78,30 +47,24 @@ const Landing: React.FC<LandingProps> = ({ onEnter }) => {
         <div className="absolute bottom-0 right-0 w-[350px] h-[350px] rounded-full bg-blue-800/15 blur-[90px]" />
       </div>
 
-      {/* ── Nav ── */}
-      <header className="relative z-10 flex items-center justify-between px-6 md:px-12 py-5 max-w-6xl mx-auto w-full">
-        <span className="text-lg font-bold tracking-tight text-white">
-          Expenses
-        </span>
-        <button
-          onClick={() => setIsAuthModalOpen(true)}
-          className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
-        >
-          Sign in
-        </button>
-      </header>
-
-      {/* ── Hero ── */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 text-center pt-10 pb-24 animate-fadeIn">
+      {/* ── Full-screen centred hero ── */}
+      <main
+        className="relative z-10 flex flex-col items-center justify-center px-6 text-center animate-fadeIn"
+        style={{
+          minHeight: '100dvh',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
+        }}
+      >
 
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold tracking-wide mb-8 select-none">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold tracking-wide mb-7 select-none">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
           Real-time sync across all devices
         </div>
 
         {/* Headline */}
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.05] mb-6 max-w-3xl">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.05] mb-5 max-w-3xl">
           <span className="text-white">Know where your</span>
           <br />
           <span className="bg-gradient-to-r from-blue-400 via-blue-300 to-indigo-400 bg-clip-text text-transparent">
@@ -110,12 +73,12 @@ const Landing: React.FC<LandingProps> = ({ onEnter }) => {
         </h1>
 
         {/* Subheadline */}
-        <p className="text-lg md:text-xl text-gray-400 mb-12 max-w-xl leading-relaxed">
+        <p className="text-base md:text-xl text-gray-400 mb-10 max-w-xl leading-relaxed">
           Track personal expenses, split bills with friends, and settle group debts — all in one place.
         </p>
 
-        {/* CTA group */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm sm:max-w-none sm:justify-center">
+        {/* CTA group — vertically centred, stacked on mobile */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full max-w-xs sm:max-w-none sm:justify-center">
 
           {/* Primary */}
           <button
@@ -164,37 +127,6 @@ const Landing: React.FC<LandingProps> = ({ onEnter }) => {
           Free forever · No credit card required
         </p>
       </main>
-
-      {/* ── Feature cards ── */}
-      <section className="relative z-10 w-full max-w-5xl mx-auto px-6 md:px-12 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <div
-              key={f.title}
-              className="
-                group rounded-2xl p-6
-                bg-white/[0.03] border border-white/[0.07]
-                backdrop-blur-sm
-                hover:bg-white/[0.06] hover:border-white/[0.12]
-                transition-all duration-300
-              "
-            >
-              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4">
-                {f.icon}
-              </div>
-              <h3 className="text-base font-semibold text-white mb-2">{f.title}</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">{f.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-white/[0.06] py-6 px-6 text-center">
-        <p className="text-xs text-gray-600">
-          © {new Date().getFullYear()} Expenses. Built for clarity.
-        </p>
-      </footer>
 
       {/* Auth Modal */}
       <AuthModal

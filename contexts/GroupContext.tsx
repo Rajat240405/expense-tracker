@@ -77,6 +77,13 @@ interface GroupContextValue {
     // Expense CRUD
     addGroupExpense: (expense: Omit<GroupExpense, 'id' | 'timestamp'>) => Promise<void>;
     deleteGroupExpense: (expenseId: string) => Promise<void>;
+    /**
+     * Optimistically removes the expense from state and returns an undo function.
+     * The actual remote deletion is deferred by `delayMs` (default 5 000 ms).
+     * Calling the returned undo function before the timer fires restores the item
+     * without touching the remote at all.
+     */
+    undoableDeleteGroupExpense: (expenseId: string, delayMs?: number) => { undo: () => void };
 
     // Settlement CRUD
     addSettlement: (settlement: Omit<Settlement, 'id' | 'timestamp'>) => Promise<void>;
@@ -299,6 +306,52 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         [user]
     );
 
+    /**
+     * Optimistic delete with undo support.
+     * Removes the item from state immediately, schedules the remote deletion,
+     * and returns an { undo } handle that cancels the remote deletion and
+     * restores the item if called before `delayMs` elapses.
+     */
+    const undoableDeleteGroupExpense = useCallback(
+        (expenseId: string, delayMs = 5000) => {
+            // Capture the item before removing it
+            let item: GroupExpense | undefined;
+            setGroupExpenses((prev) => {
+                item = prev.find((e) => e.id === expenseId);
+                return prev.filter((e) => e.id !== expenseId);
+            });
+
+            let undone = false;
+
+            const timerId = setTimeout(() => {
+                if (!undone) {
+                    // Commit remote deletion
+                    if (user) Svc.deleteExpense(expenseId);
+                }
+            }, delayMs);
+
+            return {
+                undo: () => {
+                    if (undone) return;
+                    undone = true;
+                    clearTimeout(timerId);
+                    if (item) {
+                        setGroupExpenses((prev) => {
+                            // Re-insert in timestamp order
+                            const without = prev.filter((e) => e.id !== item!.id);
+                            const idx = without.findIndex((e) => e.timestamp < item!.timestamp);
+                            if (idx === -1) return [...without, item!];
+                            const copy = [...without];
+                            copy.splice(idx, 0, item!);
+                            return copy;
+                        });
+                    }
+                },
+            };
+        },
+        [user]
+    );
+
     // ─── Settlement CRUD ──────────────────────────────────────────────────────
 
     const addSettlement = useCallback(
@@ -379,6 +432,7 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         deleteGroup,
         addGroupExpense,
         deleteGroupExpense,
+        undoableDeleteGroupExpense,
         addSettlement,
         deleteSettlement,
         getGroup,

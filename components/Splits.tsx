@@ -255,7 +255,11 @@ const Splits: React.FC<SplitsProps> = ({ customCurrencies, getCurrencySymbol, on
       {pendingSplits.length === 0 && (
         <div className="text-center py-20 px-6">
           <div className="max-w-sm mx-auto">
-            <div className="text-6xl mb-4">🤝</div>
+            <div className="flex justify-center mb-4">
+              <svg className="w-14 h-14 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
             <h3 className="text-lg font-semibold text-[#37352f] dark:text-gray-100 mb-2">
               No Pending Splits
             </h3>

@@ -3,22 +3,42 @@
 @tailwind utilities;
 
 /* Custom styles */
+html {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  /* Prevent elastic/rubber-band scrolling on iOS/Android WebView */
+  -webkit-overflow-scrolling: touch;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Disable iOS tap highlight */
+  -webkit-tap-highlight-color: transparent;
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 @layer utilities {
   .animate-fadeIn {
     animation: fadeIn 0.7s ease-out both;
+  }
+
+  /* Capacitor / PWA safe-area top padding (avoids status bar overlap) */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 

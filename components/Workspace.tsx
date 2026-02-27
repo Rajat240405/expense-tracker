@@ -453,44 +453,55 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     const expense = expenses.find(e => e.id === id);
     if (!expense) return;
 
-    // Clear any existing timer
-    if (undoTimer) clearTimeout(undoTimer);
-
-    // Sync deletion to cloud if authenticated
-    if (!isGuest && user) {
-      await DataSyncService.deleteExpense(id, user.id);
+    // Cancel any in-flight undo timer — finalize the previous deletion first
+    if (undoTimer) {
+      clearTimeout(undoTimer);
+      // If there was a pending deletion that hasn't been persisted yet, do it now
+      if (deletedExpense && !isGuest && user) {
+        DataSyncService.deleteExpense(deletedExpense.id, user.id);
+      }
     }
 
-    // Remove expense and store for undo
+    // Optimistically remove from UI immediately (feels snappy)
     setExpenses(prev => prev.filter(ex => ex.id !== id));
     setDeletedExpense(expense);
 
-    // Set timer to permanently delete after 5 seconds
+    // Defer actual cloud/localStorage deletion until the undo window closes.
+    // This way, undo can simply restore the item without needing to re-insert.
     const timer = setTimeout(() => {
+      // Undo window expired — commit the deletion
+      if (!isGuest && user) {
+        DataSyncService.deleteExpense(id, user.id);
+      }
+      // For guest mode, localStorage is kept in sync via the separate save effect
       setDeletedExpense(null);
       setUndoTimer(null);
     }, 5000);
 
     setUndoTimer(timer);
-  }, [expenses, undoTimer, isGuest, user]);
+  }, [expenses, undoTimer, deletedExpense, isGuest, user]);
 
-  const undoDelete = useCallback(async () => {
+  const undoDelete = useCallback(() => {
     if (!deletedExpense) return;
 
-    // Clear timer and restore expense
+    // Cancel the deferred cloud deletion
     if (undoTimer) {
       clearTimeout(undoTimer);
       setUndoTimer(null);
     }
 
-    // Restore to cloud if authenticated
-    if (!isGuest && user) {
-      await DataSyncService.addExpense(deletedExpense, user.id);
-    }
-
-    setExpenses(prev => [deletedExpense, ...prev]);
+    // Restore optimistically — no cloud call needed because we never deleted it
+    setExpenses(prev => {
+      // Insert back in timestamp order
+      const without = prev.filter(e => e.id !== deletedExpense.id);
+      const idx = without.findIndex(e => e.timestamp < deletedExpense.timestamp);
+      if (idx === -1) return [...without, deletedExpense];
+      const copy = [...without];
+      copy.splice(idx, 0, deletedExpense);
+      return copy;
+    });
     setDeletedExpense(null);
-  }, [deletedExpense, undoTimer, isGuest, user]);
+  }, [deletedExpense, undoTimer]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -570,8 +581,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     setIsExportModalOpen(true);
   }, []);
 
+  // ── Greeting helper ──────────────────────────────────────────────────────
+  const firstName = (() => {
+    if (!user) return '';
+    const fullName = (user.user_metadata?.full_name ?? '') as string;
+    if (fullName.trim()) return fullName.trim().split(' ')[0];
+    return user.email?.split('@')[0] ?? '';
+  })();
+
   return (
-    <div className="relative min-h-screen">
+    <div
+      className="relative min-h-screen safe-area-top"
+    >
       {/* Ambient glow — identical to landing page */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-blue-600/20 blur-[120px]" />
@@ -596,13 +617,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
               </button>
             )}
             <div>
-              <h1 className="text-4xl font-bold text-white tracking-tight">Expenses</h1>
+              <h1 className="text-4xl font-bold text-white tracking-tight">
+                {!isGuest && firstName ? `Hi ${firstName}!` : 'Expenses'}
+              </h1>
             </div>
           </div>
 
-          {/* Auth UI */}
+          {/* Auth UI — mobile: show Sync button for guests only */}
           <div className="md:hidden">
-            {isGuest ? (
+            {isGuest && (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-lg transition-colors"
@@ -610,26 +633,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 Sync
               </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 truncate max-w-[120px]">{user?.email}</span>
-                <button
-                  onClick={() => signOut()}
-                  className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
-                  title="Sign out"
-                >
-                  Sign out
-                </button>
-              </div>
             )}
           </div>
         </div>
 
         {/* Month & Budget Controls */}
         <div className="flex items-center gap-3">
-          {/* Desktop Auth UI */}
+          {/* Desktop Auth UI — show Sync button for guests only */}
           <div className="hidden md:flex items-center">
-            {isGuest ? (
+            {isGuest && (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-lg transition-colors"
@@ -637,17 +649,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 Sync
               </button>
-            ) : (
-              <div className="flex items-center gap-3 px-3 py-1.5 bg-white/[0.07] rounded-lg">
-                <span className="text-sm text-gray-300 truncate max-w-[150px]">{user?.email}</span>
-                <button
-                  onClick={() => signOut()}
-                  className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
-                  title="Sign out"
-                >
-                  Sign out
-                </button>
-              </div>
             )}
           </div>
 
@@ -722,7 +723,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                   : 'border-transparent text-gray-500 hover:text-gray-200'
               }`}
             >
-              {tab === 'personal' ? '📝 Personal' : tab === 'splits' ? '🤝 Splits' : '📊 Analytics'}
+              {tab === 'personal' ? 'Personal' : tab === 'splits' ? 'Splits' : 'Analytics'}
             </button>
           ))}
         </div>
@@ -730,7 +731,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
       {/* Conditional View Rendering */}
       {appMode === 'profile' ? (
-        <ProfileView />
+        <ProfileView expenses={expenses} />
       ) : appMode === 'groups' ? (
         selectedGroupId ? (
           <GroupDashboard
@@ -859,7 +860,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
             {Object.keys(groupedExpenses).length === 0 ? (
               <div className="text-center py-20 px-6">
                 <div className="max-w-sm mx-auto">
-                  <div className="text-6xl mb-4">📝</div>
+                  <div className="flex justify-center mb-4">
+                    <svg className="w-14 h-14 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
                   <h3 className="text-lg font-semibold text-gray-100 mb-2">
                     No expenses for {viewDate.toLocaleDateString('en-US', { month: 'long' })}
                   </h3>
@@ -979,7 +984,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                           </button>
                                           <div className="flex gap-2">
                                             <button onClick={saveEdit} className="text-green-400 hover:text-green-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-green-900/20 transition-colors">Save</button>
-                                            <button onClick={cancelEdit} className="text-gray-500 hover:text-gray-300 text-sm px-2 py-2 rounded-lg hover:bg-white/[0.08] transition-colors">✕</button>
+                                            <button onClick={cancelEdit} className="text-gray-500 hover:text-gray-300 text-sm px-2 py-2 rounded-lg hover:bg-white/[0.08] transition-colors">Cancel</button>
                                           </div>
                                         </div>
                                         <textarea
@@ -1138,19 +1143,21 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       )
       }
 
-      {/* Undo Delete Snackbar */}
+      {/* Undo Delete Snackbar — sits above the 68px bottom nav */}
       {deletedExpense && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slideUpFade">
-          <div className="bg-[#37352f] text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-4 min-w-[280px] max-w-[90vw]">
+        <div className="fixed bottom-[calc(68px+env(safe-area-inset-bottom,0px)+12px)] left-1/2 -translate-x-1/2 z-50 animate-slideUpFade">
+          <div className="bg-gray-900 border border-white/10 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-4 min-w-[280px] max-w-[90vw] overflow-hidden">
             <div className="flex-1">
               <span className="text-sm font-medium">Expense deleted</span>
             </div>
             <button
               onClick={undoDelete}
-              className="text-blue-400 hover:text-blue-300 font-semibold text-sm uppercase tracking-wide transition-colors"
+              className="text-blue-400 hover:text-blue-300 font-semibold text-sm uppercase tracking-wide transition-colors shrink-0"
             >
               Undo
             </button>
+            {/* 5-second countdown bar */}
+            <span className="absolute bottom-0 left-0 h-[3px] bg-blue-500 animate-snackbarTimer rounded-b-xl" />
           </div>
         </div>
       )}
@@ -1169,6 +1176,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         }
         .animate-slideUpFade {
           animation: slideUpFade 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes snackbarTimer {
+          from { width: 100%; }
+          to   { width: 0%;   }
+        }
+        .animate-snackbarTimer {
+          animation: snackbarTimer 5s linear forwards;
         }
       `}</style>
 

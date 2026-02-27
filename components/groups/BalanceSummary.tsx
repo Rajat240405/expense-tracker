@@ -174,7 +174,7 @@ const BalanceSummary: React.FC<BalanceSummaryProps> = ({ group, expenses, settle
                             ? `+${yourBalance.toFixed(2)}`
                             : yourBalance < -0.005
                                 ? yourBalance.toFixed(2)
-                                : 'Settled up ✓'}
+                                : 'Settled up'}
                     </span>
                 </div>
             )}
@@ -182,10 +182,14 @@ const BalanceSummary: React.FC<BalanceSummaryProps> = ({ group, expenses, settle
             {/* Settle All success banner */}
             {settleAllDone && (
                 <div className="flex items-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl">
-                    <span className="text-green-600 dark:text-green-400 text-lg">✅</span>
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
                     <span className="text-sm font-medium text-green-700 dark:text-green-300">All debts settled successfully!</span>
-                    <button onClick={() => setSettleAllDone(false)} className="ml-auto text-green-500 hover:text-green-700 dark:hover:text-green-300 text-xs">
-                        ✕
+                    <button onClick={() => setSettleAllDone(false)} title="Dismiss" className="ml-auto text-green-500 hover:text-green-700 dark:hover:text-green-300">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
             )}
@@ -193,7 +197,11 @@ const BalanceSummary: React.FC<BalanceSummaryProps> = ({ group, expenses, settle
             {/* Debt instructions */}
             {debtInstructions.length === 0 ? (
                 <div className="text-center py-6 text-sm text-gray-500 dark:text-gray-400">
-                    <div className="text-3xl mb-2">✅</div>
+                    <div className="flex justify-center mb-2">
+                    <svg className="w-10 h-10 text-green-500 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
                     All settled up!
                 </div>
             ) : (
