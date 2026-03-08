@@ -145,7 +145,21 @@ BEGIN
   SET used_at = NOW()
   WHERE id = v_invite.id;
 
-  -- Return the group_id so the frontend can add the user to the group
+  -- Add the joining user as a group member.
+  -- Runs as SECURITY DEFINER to bypass the "Creator can insert members" RLS
+  -- policy — the joiner cannot add themselves under their own privileges.
+  -- ON CONFLICT DO NOTHING makes this idempotent (safe to call twice).
+  INSERT INTO group_members (id, group_id, user_id, is_you, joined_at)
+  VALUES (
+    gen_random_uuid(),
+    v_invite.group_id::uuid,
+    v_user_id,
+    false,    -- is_you is computed dynamically in the app (user_id = auth.uid())
+    NOW()
+  )
+  ON CONFLICT (group_id, user_id) DO NOTHING;
+
+  -- Return the group_id so the frontend can load and display the group
   RETURN json_build_object(
     'ok',       true,
     'group_id', v_invite.group_id

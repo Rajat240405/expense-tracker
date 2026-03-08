@@ -24,6 +24,26 @@ allprojects {
     }
 }
 
+// Override Java toolchain for all subprojects so Gradle uses the locally
+// installed JVM (Java 22) rather than trying to download Java 21.
+subprojects {
+    plugins.withId('java') {
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(22)
+            }
+        }
+    }
+    plugins.withId('com.android.library') {
+        android {
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

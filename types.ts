@@ -124,12 +124,14 @@ export interface PersonalExpense {
 // ─── Direct 1:1 Splits (Home → Splits tab) ───────────────────────────────────
 
 export interface DirectSplit {
-  id:        string;
-  userOne:   string; // creator (auth.uid())
-  userTwo:   string; // partner profile id
-  label?:    string;
-  currency:  string;
-  createdAt: number;
+  id:          string;
+  userOne:     string; // creator (auth.uid())
+  userTwo:     string; // partner profile id (or display name for local/guest splits)
+  label?:      string;
+  currency:    string;
+  createdAt:   number;
+  partnerName?: string; // resolved partner display name (DB splits only)
+  isLocal?:    boolean; // true if stored in localStorage (name-only, offline)
 }
 
 export interface DirectExpense {

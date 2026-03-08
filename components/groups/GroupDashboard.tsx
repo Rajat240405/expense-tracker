@@ -8,11 +8,15 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 
 // ── Invite URL base ────────────────────────────────────────────────────────
-// Priority: VITE_APP_URL env var → capacitor://localhost (native) → window.location.origin
+// Priority: VITE_APP_URL env var → window.location.origin (web dev server)
+// On native (Capacitor), window.location.origin = "http://localhost" which
+// is NOT shareable. Set VITE_APP_URL to your deployed URL in .env.local.
 function getAppBaseUrl(): string {
     const envUrl = import.meta.env.VITE_APP_URL as string | undefined;
     if (envUrl) return envUrl.replace(/\/$/, '');
-    if (Capacitor.isNativePlatform()) return 'capacitor://localhost';
+    // On native without VITE_APP_URL we can't generate a shareable URL.
+    // Return empty string — callers must check for this.
+    if (Capacitor.isNativePlatform()) return '';
     return window.location.origin;
 }
 import { Group, GroupExpense } from '../../types';
@@ -48,6 +52,15 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
     const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<DashboardTab>('expenses');
     const [inviteState, setInviteState] = useState<InviteState>('idle');
+    const [inviteModal, setInviteModal] = useState<{ token: string; url: string } | null>(null);
+    const [copiedField, setCopiedField] = useState<'token' | 'url' | null>(null);
+
+    const copyToClipboard = useCallback((text: string, field: 'token' | 'url') => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedField(field);
+            setTimeout(() => setCopiedField(null), 2000);
+        });
+    }, []);
 
     // ── Undo snackbar state ───────────────────────────────────────────────────
     const [snackbar, setSnackbar] = useState<{ label: string; undo: () => void } | null>(null);
@@ -85,10 +98,10 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
         try {
             const result = await createInvite(group?.id ?? '');
             if ('error' in result) throw new Error(result.error);
-            const url = `${getAppBaseUrl()}/join/${result.token}`;
-            await navigator.clipboard.writeText(url);
-            setInviteState('copied');
-            setTimeout(() => setInviteState('idle'), 2000);
+            const base = getAppBaseUrl();
+            const url = base ? `${base}/join/${result.token}` : '';
+            setInviteModal({ token: result.token, url });
+            setInviteState('idle');
         } catch {
             setInviteState('error');
             setTimeout(() => setInviteState('idle'), 2500);
@@ -118,6 +131,7 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
             <div className="flex items-center gap-3 pt-6 pb-4">
                 <button
                     onClick={onBack}
+                    title="Back"
                     className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,6 +298,99 @@ const GroupDashboard: React.FC<GroupDashboardProps> = ({ groupId, onBack }) => {
                     animation: snackbarCountdown 5s linear forwards;
                 }
             `}</style>
+
+            {/* ── Invite Code Modal ───────────────────────────────────────── */}
+            {inviteModal && (
+                <div
+                    className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+                    onClick={() => setInviteModal(null)}
+                >
+                    <div
+                        className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Invite to {group.name}</h3>
+                            <button
+                                onClick={() => setInviteModal(null)}
+                                title="Close"
+                                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Join Code */}
+                        <div className="mb-4">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">Join Code</p>
+                            <button
+                                onClick={() => copyToClipboard(inviteModal.token, 'token')}
+                                className={`w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-all text-left ${
+                                    copiedField === 'token'
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-600'
+                                        : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500'
+                                }`}
+                            >
+                                <code className="flex-1 text-[11px] font-mono text-gray-800 dark:text-gray-200 break-all select-all">
+                                    {inviteModal.token}
+                                </code>
+                                <span className={`ml-2 flex-shrink-0 text-xs font-semibold ${
+                                    copiedField === 'token' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'
+                                }`}>
+                                    {copiedField === 'token' ? 'Copied!' : 'Tap to copy'}
+                                </span>
+                            </button>
+                            <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">Other person enters this code in Groups → Join with Code</p>
+                        </div>
+
+                        {/* Full link (only when URL available) */}
+                        {inviteModal.url && (
+                            <div className="mb-4">
+                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">Invite Link</p>
+                                <button
+                                    onClick={() => copyToClipboard(inviteModal.url, 'url')}
+                                    className={`w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-all text-left ${
+                                        copiedField === 'url'
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-600'
+                                            : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500'
+                                    }`}
+                                >
+                                    <span className="flex-1 text-[11px] font-mono text-gray-600 dark:text-gray-400 break-all select-all">
+                                        {inviteModal.url}
+                                    </span>
+                                    <span className={`ml-2 flex-shrink-0 text-xs font-semibold ${
+                                        copiedField === 'url' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'
+                                    }`}>
+                                        {copiedField === 'url' ? 'Copied!' : 'Tap to copy'}
+                                    </span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Native share button */}
+                        {'share' in navigator && (
+                            <button
+                                onClick={() => {
+                                    const text = inviteModal.url
+                                        ? `Join my group "${group.name}"!\n\nLink: ${inviteModal.url}\n\nOr enter code in the app:\n${inviteModal.token}`
+                                        : `Join my group "${group.name}" on Expenses!\n\nOpen the app → Groups → Join with Code, then enter:\n${inviteModal.token}`;
+                                    navigator.share({ title: `Join ${group.name}`, text }).catch(() => {});
+                                }}
+                                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 mb-3"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                                Share Invite
+                            </button>
+                        )}
+
+                        <p className="text-xs text-gray-400 dark:text-gray-500 text-center">Expires in 7 days · single use</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

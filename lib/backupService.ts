@@ -16,6 +16,7 @@
  */
 
 import type { Expense, Group, GroupExpense, Settlement } from '../types';
+import { downloadFile } from './fileDownload';
 
 // ─── Schema version ───────────────────────────────────────────────────────────
 
@@ -38,12 +39,12 @@ export interface BackupPayload {
 /**
  * Build and immediately download a full JSON backup file.
  */
-export function exportFullBackup(
+export async function exportFullBackup(
     personalExpenses: Expense[],
     groups: Group[],
     groupExpenses: GroupExpense[],
     settlements: Settlement[]
-): void {
+): Promise<void> {
     const payload: BackupPayload = {
         schemaVersion: BACKUP_SCHEMA_VERSION,
         exportedAt: new Date().toISOString(),
@@ -55,7 +56,7 @@ export function exportFullBackup(
     };
 
     const filename = `expenses-backup-${dateForFilename()}.json`;
-    downloadFile(filename, JSON.stringify(payload, null, 2), 'application/json');
+    await downloadFile(filename, JSON.stringify(payload, null, 2), 'application/json');
 }
 
 // ─── Import / Validation ──────────────────────────────────────────────────────
@@ -210,18 +211,6 @@ export function pickJsonFile(): Promise<string> {
 }
 
 // ─── Private utils ────────────────────────────────────────────────────────────
-
-function downloadFile(filename: string, content: string, mimeType: string): void {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
 
 function dateForFilename(): string {
     return new Date().toISOString().slice(0, 10); // YYYY-MM-DD

@@ -30,11 +30,17 @@ const Landing: React.FC<LandingProps> = ({ onEnter }) => {
     const redirectTo = Capacitor.isNativePlatform()
       ? 'capacitor://localhost/auth/callback'
       : `${window.location.origin}/auth/callback`;
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
     });
-    // Page will redirect; no need to reset loading state.
+    if (error) {
+      console.error('[Landing] Google sign-in error:', error.message);
+    }
+    // Always reset so the spinner doesn't stick if the user cancels,
+    // closes the popup, or the redirect fails. On a successful redirect
+    // the page navigates away before this line is reached anyway.
+    setGoogleLoading(false);
   };
 
   return (

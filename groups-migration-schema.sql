@@ -376,3 +376,14 @@ CREATE POLICY "Creator can delete settlement"
 --   ALTER COLUMN group_id TYPE UUID USING group_id::UUID,
 --   ADD CONSTRAINT fk_group_invites_group
 --     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE;
+
+
+-- ---------------------------------------------------------------------------
+-- 7. Enable Supabase Realtime for group tables
+--    This is required for cross-device settlement/expense sync.
+--    Run once — idempotent (Supabase ignores tables already in the publication).
+-- ---------------------------------------------------------------------------
+ALTER PUBLICATION supabase_realtime ADD TABLE public.groups;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.group_members;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.group_expenses;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.group_settlements;

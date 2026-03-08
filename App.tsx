@@ -14,8 +14,10 @@
  */
 
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import type { AppMode } from './types';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { GroupProvider } from './contexts/GroupContext';
 import Landing from './components/Landing';
 import Workspace from './components/Workspace';
@@ -48,11 +50,18 @@ function LandingRoute() {
 }
 
 // ─── Workspace wrapper — bridges onBack prop ──────────────────────────────────
-// Workspace.tsx stays completely unchanged.
-
+// WorkspaceRoute reads router location state so invite-join can land on the groups tab.
 function WorkspaceRoute() {
   const navigate = useNavigate();
-  return <Workspace onBack={() => navigate('/')} />;
+  const location = useLocation();
+  const state = location.state as { tab?: string; openGroupId?: string } | null;
+  return (
+    <Workspace
+      onBack={() => navigate('/')}
+      initialMode={(state?.tab === 'groups' ? 'groups' : undefined) as AppMode | undefined}
+      initialGroupId={state?.openGroupId ?? null}
+    />
+  );
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -61,6 +70,7 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <NotificationProvider>
         <GroupProvider>
           <ThemeSync />
           <div className="min-h-screen w-full bg-[#080c14] text-gray-100">
@@ -89,6 +99,7 @@ const App: React.FC = () => {
             </Routes>
           </div>
         </GroupProvider>
+        </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

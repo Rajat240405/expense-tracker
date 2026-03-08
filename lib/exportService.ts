@@ -7,20 +7,8 @@
 
 import { Group, GroupExpense, Settlement } from '../types';
 import { calculateNetBalances } from './balanceEngine';
+import { downloadFile } from './fileDownload';
 
-// ─── File Download Primitive ──────────────────────────────────────────────────
-
-function downloadFile(filename: string, content: string, mimeType: string): void {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-}
 
 // ─── JSON Export ─────────────────────────────────────────────────────────────
 
@@ -39,11 +27,11 @@ export interface GroupExportPayload {
  * Serialises all groups with their expenses, settlements, and computed balances
  * and triggers a browser download of a JSON file.
  */
-export function exportGroupsAsJSON(
+export async function exportGroupsAsJSON(
     groups: Group[],
     allExpenses: GroupExpense[],
     allSettlements: Settlement[]
-): void {
+): Promise<void> {
     const payload: GroupExportPayload = {
         exportedAt: new Date().toISOString(),
         appVersion: '2.0.0',
@@ -55,7 +43,7 @@ export function exportGroupsAsJSON(
         }),
     };
 
-    downloadFile(
+    await downloadFile(
         `expense-groups-export-${formatDateForFilename()}.json`,
         JSON.stringify(payload, null, 2),
         'application/json'
@@ -67,11 +55,11 @@ export function exportGroupsAsJSON(
 /**
  * Generates a multi-section CSV (one section per group) and triggers a download.
  */
-export function exportGroupsAsCSV(
+export async function exportGroupsAsCSV(
     groups: Group[],
     allExpenses: GroupExpense[],
     allSettlements: Settlement[]
-): void {
+): Promise<void> {
     const sections: string[] = [];
 
     groups.forEach((group) => {
@@ -132,7 +120,7 @@ export function exportGroupsAsCSV(
 
     const csvContent = sections.join('\n\n' + '─'.repeat(60) + '\n\n');
 
-    downloadFile(
+    await downloadFile(
         `expense-groups-export-${formatDateForFilename()}.csv`,
         csvContent,
         'text/csv;charset=utf-8;'
@@ -153,7 +141,7 @@ export interface PersonalExpenseRow {
 /**
  * Exports the flat personal expense list (non-group) as a CSV file.
  */
-export function exportPersonalExpensesAsCSV(expenses: PersonalExpenseRow[]): void {
+export async function exportPersonalExpensesAsCSV(expenses: PersonalExpenseRow[]): Promise<void> {
     const lines: string[] = [
         'PERSONAL EXPENSES',
         'Date,Amount,Currency,Category,Note',
@@ -170,8 +158,8 @@ export function exportPersonalExpensesAsCSV(expenses: PersonalExpenseRow[]): voi
             ),
     ];
 
-    downloadFile(
-        `personal-expenses-export-${formatDateForFilename()}.csv`,
+    await downloadFile(
+        `personal-expenses-${formatDateForFilename()}.csv`,
         lines.join('\n'),
         'text/csv;charset=utf-8;'
     );

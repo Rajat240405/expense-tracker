@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGroups } from '../../contexts/GroupContext';
 import { calculateNetBalances, simplifyDebts } from '../../lib/balanceEngine';
 import CreateGroupModal from './CreateGroupModal';
@@ -15,9 +16,30 @@ interface GroupListProps {
 }
 
 const GroupList: React.FC<GroupListProps> = ({ onSelectGroup }) => {
-    const { groups, groupExpenses, settlements, deleteGroup } = useGroups();
+    const { groups, groupExpenses, settlements, deleteGroup, loading: groupsLoading } = useGroups();
+    const navigate = useNavigate();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [showJoinCode, setShowJoinCode] = useState(false);
+    const [joinCodeInput, setJoinCodeInput] = useState('');
+
+    // Show skeleton while initial data is loading
+    if (groupsLoading) {
+        return (
+            <div className="max-w-2xl mx-auto px-4 pb-32">
+                <div className="flex items-center justify-between pt-6 pb-5">
+                    <div className="space-y-2">
+                        <div className="h-7 w-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                        <div className="h-4 w-40 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                    </div>
+                    <div className="h-10 w-28 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+                </div>
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-24 bg-gray-100 dark:bg-gray-800 rounded-2xl mb-3 animate-pulse" />
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-2xl mx-auto px-4 pb-32">
@@ -30,16 +52,62 @@ const GroupList: React.FC<GroupListProps> = ({ onSelectGroup }) => {
                         {groups.length === 0 ? 'Create your first group to get started' : `${groups.length} group${groups.length !== 1 ? 's' : ''}`}
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsCreateOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-colors shadow-sm"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    New Group
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => { setShowJoinCode((v) => !v); setJoinCodeInput(''); }}
+                        title="Join with invite code"
+                        className="flex items-center gap-1.5 px-3 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-sm rounded-xl transition-colors hover:border-blue-400 dark:hover:border-blue-500 bg-white dark:bg-gray-800"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                        Join
+                    </button>
+                    <button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-colors shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        New Group
+                    </button>
+                </div>
             </div>
+
+            {/* Join with code panel */}
+            {showJoinCode && (
+                <div className="mb-5 flex gap-2 items-center">
+                    <input
+                        type="text"
+                        value={joinCodeInput}
+                        onChange={(e) => setJoinCodeInput(e.target.value.trim())}
+                        placeholder="Paste invite code here…"
+                        autoFocus
+                        className="flex-1 px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && joinCodeInput) navigate(`/join/${joinCodeInput}`);
+                            if (e.key === 'Escape') { setShowJoinCode(false); setJoinCodeInput(''); }
+                        }}
+                    />
+                    <button
+                        onClick={() => { if (joinCodeInput) navigate(`/join/${joinCodeInput}`); }}
+                        disabled={!joinCodeInput}
+                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
+                    >
+                        Join
+                    </button>
+                    <button
+                        onClick={() => { setShowJoinCode(false); setJoinCodeInput(''); }}
+                        title="Cancel"
+                        className="p-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            )}
 
             {/* Empty state */}
             {groups.length === 0 && (

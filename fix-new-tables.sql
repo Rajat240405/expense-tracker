@@ -146,3 +146,54 @@ CREATE POLICY "Payer can update direct expenses"
 CREATE POLICY "Payer can delete direct expenses"
   ON direct_expenses FOR DELETE TO authenticated
   USING (auth.uid() = paid_by);
+
+-- =============================================================================
+-- RPC: create_direct_split_by_email
+-- Creates a direct split between the caller and a partner identified by email.
+-- SECURITY DEFINER so it can read auth.users.email without exposing it via RLS.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION create_direct_split_by_email(
+    partner_email TEXT,
+    p_label       TEXT DEFAULT NULL,
+    p_currency    TEXT DEFAULT 'INR'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_creator_id UUID := auth.uid();
+    v_partner_id UUID;
+    v_split_id   UUID;
+BEGIN
+    IF v_creator_id IS NULL THEN
+        RETURN json_build_object('error', 'not_authenticated');
+    END IF;
+
+    SELECT id INTO v_partner_id
+    FROM auth.users
+    WHERE email = lower(trim(partner_email));
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('error', 'user_not_found');
+    END IF;
+
+    IF v_partner_id = v_creator_id THEN
+        RETURN json_build_object('error', 'cannot_split_with_self');
+    END IF;
+
+    INSERT INTO direct_splits (id, user_one, user_two, label, currency)
+    VALUES (gen_random_uuid(), v_creator_id, v_partner_id, p_label, p_currency)
+    RETURNING id INTO v_split_id;
+
+    RETURN json_build_object('ok', true, 'split_id', v_split_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION create_direct_split_by_email(TEXT, TEXT, TEXT) TO authenticated;
+
+-- Enable Realtime for direct split tables (required for cross-device settle sync)
+ALTER PUBLICATION supabase_realtime ADD TABLE public.direct_splits;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.direct_expenses;

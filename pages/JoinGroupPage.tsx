@@ -13,7 +13,7 @@
  *  5. On any error → show a clear error UI.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroups } from '../contexts/GroupContext';
@@ -43,6 +43,8 @@ const JoinGroupPage: React.FC = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [status, setStatus] = useState<Status>('loading');
     const [errorMsg, setErrorMsg] = useState('');
+    // Guard: don't call handleRedeem more than once (token refreshes re-emit user)
+    const hasRedeemedRef = useRef(false);
 
     // ── Main effect: runs whenever auth resolves ──────────────────────────────
     useEffect(() => {
@@ -60,16 +62,26 @@ const JoinGroupPage: React.FC = () => {
             return;
         }
 
-        // Authenticated — redeem the invite
+        // Authenticated — redeem the invite (only once)
+        if (hasRedeemedRef.current) return;
+        hasRedeemedRef.current = true;
         setStatus('joining');
         handleRedeem(token);
-    }, [user, authLoading, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, authLoading, token]);
 
     // ── Redeem logic ──────────────────────────────────────────────────────────
     const handleRedeem = async (token: string) => {
         const result = await redeemInvite(token);
 
         if (result.ok === false) {
+            // 'already_used' means the user clicked/retried the link after the first
+            // successful redeem. The group_members INSERT uses ON CONFLICT DO NOTHING
+            // so they are a member regardless — navigate to workspace instead of erroring.
+            if (result.error === 'already_used') {
+                navigate('/workspace', { replace: true, state: { tab: 'groups' } });
+                return;
+            }
             setStatus('error');
             setErrorMsg(ERROR_MESSAGES[result.error] ?? 'Something went wrong.');
             return;
@@ -77,15 +89,13 @@ const JoinGroupPage: React.FC = () => {
 
         const { groupId } = result;
 
-        // Fetch the real group from Supabase and add it to local context.
-        // (The RPC already inserted the user into group_members, so this
-        //  fetch will now succeed and return the full group with members.)
+        // Best-effort: try to inject the group into local context immediately.
         await loadGroup(groupId);
 
-        // Navigate to the workspace, signalling which group to open
+        // Navigate to workspace with groups tab and the joined group pre-opened
         navigate('/workspace', {
             replace: true,
-            state: { openGroupId: groupId },
+            state: { tab: 'groups', openGroupId: groupId },
         });
     };
 
@@ -126,10 +136,10 @@ const JoinGroupPage: React.FC = () => {
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-sm">{msg}</p>
                 <button
-                    onClick={() => navigate('/')}
+                    onClick={() => navigate('/workspace', { replace: true, state: { tab: 'groups' } })}
                     className="mt-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
                 >
-                    Go to app
+                    Go to Groups
                 </button>
             </div>
         );

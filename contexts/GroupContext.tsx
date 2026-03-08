@@ -1,3 +1,4 @@
+// @refresh reset
 /**
  * GroupContext.tsx
  *
@@ -29,12 +30,27 @@ import React, {
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import * as Svc from '../lib/GroupService';
+import {
+    createNotification,
+    createNotificationsForUsers,
+    getGroupMemberUserIds,
+    memberIdsToUserIds,
+} from '../lib/notificationService';
 import type {
     Group,
     GroupMember,
     GroupExpense,
     Settlement,
 } from '../types';
+
+// ─── Module-level cache (auth users only) ────────────────────────────────────
+// Stores the last successfully fetched snapshot per user so the Groups tab
+// renders instantly on app open / tab switch while a background refresh runs.
+const _groupCache = new Map<string, {
+    groups:      Group[];
+    expenses:    GroupExpense[];
+    settlements: Settlement[];
+}>();
 
 // ─── localStorage keys (guest mode only) ─────────────────────────────────────
 
@@ -119,14 +135,21 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (authLoading) return;
 
         let cancelled = false;
-        setLoading(true);
 
         if (user) {
             // ── Authenticated: wipe guest sandbox, fetch from Supabase ──
             lsClearAll();
-            setGroups([]);
-            setGroupExpenses([]);
-            setSettlements([]);
+
+            // Show cached data instantly so the UI is never blank
+            const cached = _groupCache.get(user.id);
+            if (cached) {
+                setGroups(cached.groups);
+                setGroupExpenses(cached.expenses);
+                setSettlements(cached.settlements);
+                setLoading(false);
+            } else {
+                setLoading(true);
+            }
 
             (async () => {
                 const fetchedGroups = await Svc.fetchGroups();
@@ -139,6 +162,11 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 ]);
 
                 if (cancelled) return;
+                _groupCache.set(user.id, {
+                    groups:      fetchedGroups,
+                    expenses:    fetchedExpenses,
+                    settlements: fetchedSettlements,
+                });
                 setGroups(fetchedGroups);
                 setGroupExpenses(fetchedExpenses);
                 setSettlements(fetchedSettlements);
@@ -153,7 +181,9 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
 
         return () => { cancelled = true; };
-    }, [user, authLoading]);
+    // Use user?.id so JWT token refreshes don't re-trigger a full data reload
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, authLoading]);
 
     // ── Guest localStorage sync (only fires when not authenticated) ───────────
     useEffect(() => {
@@ -218,7 +248,9 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (debounceTimer) clearTimeout(debounceTimer);
             supabase.removeChannel(channel);
         };
-    }, [user]);
+    // Use user?.id so token refreshes don't tear down and re-create the Realtime channel
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id]);
 
     // ─── Group CRUD ───────────────────────────────────────────────────────────
 
@@ -286,6 +318,19 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 // throws with real Supabase message on failure
                 const saved = await Svc.addExpense(expense, user.id);
                 setGroupExpenses((prev) => [saved, ...prev]);
+                // Notify other group members — fire-and-forget, non-blocking
+                getGroupMemberUserIds(expense.groupId, user.id)
+                    .then((userIds) =>
+                        userIds.length > 0
+                            ? createNotificationsForUsers(userIds, {
+                                  actorId: user.id,
+                                  type: 'group_expense_added',
+                                  entityId: expense.groupId,
+                                  message: `New expense: ${expense.description} (${expense.currency} ${expense.totalAmount})`,
+                              })
+                            : Promise.resolve()
+                    )
+                    .catch(() => {/* non-critical */});
             } else {
                 const local: GroupExpense = {
                     ...expense,
@@ -360,6 +405,26 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 const saved = await Svc.addSettlement(settlement, user.id);
                 if (!saved) throw new Error('Failed to add settlement');
                 setSettlements((prev) => [saved, ...prev]);
+                // Notify both sides — fire-and-forget
+                memberIdsToUserIds([settlement.fromMemberId, settlement.toMemberId])
+                    .then((map) => {
+                        const targetUserIds = [
+                            map[settlement.fromMemberId],
+                            map[settlement.toMemberId],
+                        ].filter((uid): uid is string => !!uid && uid !== user.id);
+                        return Promise.all(
+                            targetUserIds.map((uid) =>
+                                createNotification({
+                                    userId:   uid,
+                                    actorId:  user.id,
+                                    type:     'settlement_completed',
+                                    entityId: settlement.groupId,
+                                    message:  `Settlement of ${settlement.currency} ${settlement.amount} recorded`,
+                                })
+                            )
+                        );
+                    })
+                    .catch(() => {/* non-critical */});
             } else {
                 const local: Settlement = {
                     ...settlement,
@@ -411,11 +476,18 @@ export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const loadGroup = useCallback(
         async (groupId: string) => {
             if (!user) return;
-            const group = await Svc.fetchGroup(groupId);
-            if (!group) return;
-            setGroups((prev) =>
-                prev.some((g) => g.id === groupId) ? prev : [group, ...prev]
-            );
+            try {
+                const group = await Svc.fetchGroup(groupId);
+                if (!group) return;
+                setGroups((prev) =>
+                    prev.some((g) => g.id === groupId) ? prev : [group, ...prev]
+                );
+            } catch (err) {
+                // Non-fatal: RLS may briefly block the fetch right after the
+                // redeem_invite RPC inserts the group_members row. The full
+                // fetchGroups() called on next workspace mount will catch it.
+                console.warn('[loadGroup] could not fetch group after invite redeem:', err);
+            }
         },
         [user]
     );

@@ -10,6 +10,7 @@ import Visualize from './Visualize';
 import BottomNav from './BottomNav';
 import ProfileView from './profile/ProfileView';
 import DirectSplitsView from './home/DirectSplitsView';
+import NotificationBell from './notifications/NotificationBell';
 import { useGroups } from '../contexts/GroupContext';
 import { AppMode, HomeTab } from '../types';
 import { exportGroupsAsJSON, exportGroupsAsCSV, exportPersonalExpensesAsCSV } from '../lib/exportService';
@@ -21,6 +22,12 @@ import MonthPickerModal from './pickers/MonthPickerModal';
 import CategoryPickerModal from './pickers/CategoryPickerModal';
 import CurrencyPickerModal from './pickers/CurrencyPickerModal';
 import { format, parse } from 'date-fns';
+import { supabase } from '../lib/supabase';
+
+// Module-level cache for personal expenses — keyed by user id.
+// Lets the home tab render instantly on app open / revisit while a
+// background Supabase refresh completes in the background.
+const _expensesCache = new Map<string, Expense[]>();
 
 const PREDEFINED_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Other'];
 
@@ -47,6 +54,8 @@ const CURRENCY_SYMBOL = '$';
 
 interface WorkspaceProps {
   onBack?: () => void;
+  initialMode?: AppMode;
+  initialGroupId?: string | null;
 }
 
 // Helper to format date for display (dd MMM yyyy)
@@ -97,7 +106,7 @@ const shouldAutoCollapse = (dateLabel: string): boolean => {
   return dateLabel !== 'Today' && dateLabel !== 'Yesterday';
 };
 
-const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
+const Workspace: React.FC<WorkspaceProps> = ({ onBack, initialMode, initialGroupId }) => {
   // --- STATE ---
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -108,9 +117,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
 
   // View State
   const [viewDate, setViewDate] = useState(new Date()); // For tracking current month view
-  const [appMode, setAppMode]   = useState<AppMode>('home');
-  const [homeTab, setHomeTab]   = useState<HomeTab>('personal');
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [appMode, setAppMode] = useState<AppMode>(initialMode ?? 'home');
+  const [homeTab, setHomeTab] = useState<HomeTab>('personal');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId ?? null);
 
   // Groups data (from context) — renamed to avoid collision with groupedExpenses local var
   const { groups: allGroups, groupExpenses: allGroupExpenses, settlements: allSettlements } = useGroups();
@@ -156,19 +165,28 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   useEffect(() => {
     const loadData = async () => {
       if (!isGuest && user) {
-        // Authenticated: Load from Supabase
+        // Authenticated: show cached expenses instantly, then refresh from Supabase
+        const cached = _expensesCache.get(user.id);
+        if (cached) {
+          setExpenses(cached);
+        }
+
         const cloudExpenses = await DataSyncService.fetchExpenses(user.id);
+        _expensesCache.set(user.id, cloudExpenses);
         setExpenses(cloudExpenses);
 
         // Check if we need to migrate local data
         if (!hasCheckedMigration) {
-          const localExpenses = localStorage.getItem('expenses_v1');
-          if (localExpenses) {
-            const parsed: Expense[] = JSON.parse(localExpenses);
-            if (parsed.length > 0) {
-              const hasCloud = await DataSyncService.hasCloudData(user.id);
-              if (!hasCloud) {
-                setIsMigrationModalOpen(true);
+          const migrationDismissed = localStorage.getItem('migration_dismissed_v1') === 'true';
+          if (!migrationDismissed) {
+            const localExpenses = localStorage.getItem('expenses_v1');
+            if (localExpenses) {
+              const parsed: Expense[] = JSON.parse(localExpenses);
+              if (parsed.length > 0) {
+                const hasCloud = await DataSyncService.hasCloudData(user.id);
+                if (!hasCloud) {
+                  setIsMigrationModalOpen(true);
+                }
               }
             }
           }
@@ -215,14 +233,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
     };
 
     loadData();
-  }, [user, isGuest, hasCheckedMigration]);
+    // Use user?.id (not user) so JWT token refreshes don't re-trigger a full reload
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isGuest, hasCheckedMigration]);
 
   // Save to localStorage for guests, Supabase for authenticated
   useEffect(() => {
     if (isGuest) {
       localStorage.setItem('expenses_v1', JSON.stringify(expenses));
+    } else if (user) {
+      // Keep module-level cache in sync so the next app open is instant
+      _expensesCache.set(user.id, expenses);
     }
-  }, [expenses, isGuest]);
+  }, [expenses, isGuest, user]);
 
   useEffect(() => {
     localStorage.setItem('custom_categories_v1', JSON.stringify(customCategories));
@@ -582,12 +605,64 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
   }, []);
 
   // ── Greeting helper ──────────────────────────────────────────────────────
-  const firstName = (() => {
+  const [firstName, setFirstName] = useState<string>(() => {
     if (!user) return '';
     const fullName = (user.user_metadata?.full_name ?? '') as string;
     if (fullName.trim()) return fullName.trim().split(' ')[0];
     return user.email?.split('@')[0] ?? '';
-  })();
+  });
+
+  useEffect(() => {
+    if (!user) { setFirstName(''); return; }
+    // Seed immediately from JWT
+    const fullName = (user.user_metadata?.full_name ?? '') as string;
+    if (fullName.trim()) setFirstName(fullName.trim().split(' ')[0]);
+    // Then upgrade from DB profile
+    supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.display_name) setFirstName(data.display_name.trim().split(' ')[0]);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Category color helper — deterministic palette
+  const PASTEL_COLORS = [
+    'bg-gray-100 text-gray-700',
+    'bg-orange-100 text-orange-800',
+    'bg-yellow-100 text-yellow-800',
+    'bg-green-100 text-green-800',
+    'bg-blue-100 text-blue-800',
+    'bg-purple-100 text-purple-800',
+    'bg-pink-100 text-pink-800',
+    'bg-red-100 text-red-800',
+    'bg-teal-100 text-teal-800',
+    'bg-indigo-100 text-indigo-800',
+    'bg-rose-100 text-rose-800',
+    'bg-cyan-100 text-cyan-800',
+    'bg-amber-100 text-amber-800',
+    'bg-lime-100 text-lime-800',
+    'bg-emerald-100 text-emerald-800',
+    'bg-violet-100 text-violet-800',
+    'bg-fuchsia-100 text-fuchsia-800',
+  ];
+  const getCategoryColor = useCallback((category: string): string => {
+    const normalized = category.trim().toLowerCase();
+    if (normalized === 'food') return 'bg-orange-100 text-orange-800';
+    if (normalized === 'travel') return 'bg-emerald-100 text-emerald-800';
+    if (normalized === 'shopping') return 'bg-blue-100 text-blue-800';
+    if (normalized === 'bills') return 'bg-red-100 text-red-800';
+    if (normalized === 'other') return 'bg-gray-100 text-gray-600';
+    let hash = 0;
+    for (let i = 0; i < normalized.length; i++) {
+      hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return PASTEL_COLORS[Math.abs(hash) % PASTEL_COLORS.length];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -599,160 +674,178 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
         <div className="absolute top-1/3 -left-32 w-[400px] h-[400px] rounded-full bg-indigo-700/15 blur-[100px]" />
         <div className="absolute bottom-0 right-0 w-[350px] h-[350px] rounded-full bg-blue-800/15 blur-[90px]" />
       </div>
-    <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 pb-28 font-sans">
+      <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 pb-28 font-sans">
 
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
-        <div className="flex items-center justify-between w-full md:w-auto">
+        {/* Header & Controls */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+          <div className="flex items-center justify-between w-full md:w-auto">
+            <div className="flex items-center gap-3">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="p-2 text-gray-400 hover:text-gray-200 hover:bg-white/[0.08] rounded-lg transition-colors"
+                  title="Back to landing"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+              <div>
+                <h1 className="text-4xl font-bold text-white tracking-tight">
+                  {!isGuest && firstName ? `Hi ${firstName}!` : 'Expenses'}
+                </h1>
+              </div>
+            </div>
+
+            {/* Auth UI — mobile: bell for auth users, Sync for guests */}
+            <div className="md:hidden flex items-center gap-2">
+              {!isGuest && <NotificationBell />}
+              {isGuest && (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  Sync
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Month & Budget Controls */}
           <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="p-2 text-gray-400 hover:text-gray-200 hover:bg-white/[0.08] rounded-lg transition-colors"
-                title="Back to landing"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-            <div>
-              <h1 className="text-4xl font-bold text-white tracking-tight">
-                {!isGuest && firstName ? `Hi ${firstName}!` : 'Expenses'}
-              </h1>
+            {/* Desktop Auth UI — bell for auth users, Sync for guests */}
+            <div className="hidden md:flex items-center gap-2">
+              {!isGuest && <NotificationBell />}
+              {isGuest && (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  Sync
+                </button>
+              )}
             </div>
-          </div>
 
-          {/* Auth UI — mobile: show Sync button for guests only */}
-          <div className="md:hidden">
-            {isGuest && (
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                Sync
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Month & Budget Controls */}
-        <div className="flex items-center gap-3">
-          {/* Desktop Auth UI — show Sync button for guests only */}
-          <div className="hidden md:flex items-center">
-            {isGuest && (
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                Sync
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-6 bg-white/[0.06] p-1.5 rounded-lg border border-white/[0.08]">
-            <div className="flex items-center gap-2">
-              <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-white/[0.10] rounded text-gray-400" title="Previous month">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsMonthPickerOpen(true)}
-                className="text-sm font-semibold text-white bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-white/[0.10] transition-colors"
-              >
-                {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </button>
-              <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-white/[0.10] rounded text-gray-400" title="Next month">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-              </button>
-            </div>
-            <div className="h-4 w-px bg-white/20"></div>
-            <div className="flex items-center gap-2 pr-2">
-              <span className="text-xs font-semibold uppercase text-gray-400">Budget</span>
-              <button
-                type="button"
-                onClick={() => setIsBudgetCurrencyPickerOpen(true)}
-                className="text-xs font-semibold text-gray-300 hover:text-white transition-colors px-1"
-                title="Change budget currency"
-              >
-                {getCurrencySymbol(budgetCurrency, customCurrencies)}
-              </button>
-              <input
-                type="number"
-                value={budget || ''}
-                onChange={(e) => setBudget(parseFloat(e.target.value))}
-                placeholder="Set..."
-                className="w-20 bg-transparent border-b border-white/20 focus:border-blue-400 outline-none text-sm font-medium text-white text-right p-0"
-              />
+            <div className="flex items-center gap-6 bg-white/[0.06] p-1.5 rounded-lg border border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleMonthChange(-1)} className="p-1 hover:bg-white/[0.10] rounded text-gray-400" title="Previous month">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMonthPickerOpen(true)}
+                  className="text-sm font-semibold text-white bg-transparent outline-none cursor-pointer px-2 py-1 rounded hover:bg-white/[0.10] transition-colors"
+                >
+                  {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </button>
+                <button onClick={() => handleMonthChange(1)} className="p-1 hover:bg-white/[0.10] rounded text-gray-400" title="Next month">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+              <div className="h-4 w-px bg-white/20"></div>
+              <div className="flex items-center gap-2 pr-2">
+                <span className="text-xs font-semibold uppercase text-gray-400">Budget</span>
+                <button
+                  type="button"
+                  onClick={() => setIsBudgetCurrencyPickerOpen(true)}
+                  className="text-xs font-semibold text-gray-300 hover:text-white transition-colors px-1"
+                  title="Change budget currency"
+                >
+                  {getCurrencySymbol(budgetCurrency, customCurrencies)}
+                </button>
+                <input
+                  type="number"
+                  value={budget || ''}
+                  onChange={(e) => setBudget(parseFloat(e.target.value))}
+                  placeholder="Set..."
+                  className="w-20 bg-transparent border-b border-white/20 focus:border-blue-400 outline-none text-sm font-medium text-white text-right p-0"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Budget Status (Soft) */}
-      {budget > 0 && (
-        <div className="mb-8 text-sm font-medium text-gray-300">
-          {totalInBudgetCurrency === 0 ? (
-            <span className="text-gray-400">
-              No spending yet in {getCurrencySymbol(budgetCurrency, customCurrencies)} {CURRENCIES.find(c => c.code === budgetCurrency)?.name || customCurrencies.find(c => c.code === budgetCurrency)?.name || budgetCurrency}
-            </span>
-          ) : budget - totalInBudgetCurrency >= 0 ? (
-            <span className="text-gray-400">
-              <span className="text-emerald-400 font-semibold">{getCurrencySymbol(budgetCurrency, customCurrencies)}{(budget - totalInBudgetCurrency).toFixed(2)}</span> left in {getCurrencySymbol(budgetCurrency, customCurrencies)} budget this month
-            </span>
-          ) : (
-            <span className="text-orange-400">
-              {getCurrencySymbol(budgetCurrency, customCurrencies)}{Math.abs(budget - totalInBudgetCurrency).toFixed(2)} over {getCurrencySymbol(budgetCurrency, customCurrencies)} budget
-            </span>
-          )}
-        </div>
-      )}
+        {/* Budget Status (Soft) */}
+        {budget > 0 && (
+          <div className="mb-8 text-sm font-medium text-gray-300">
+            {totalInBudgetCurrency === 0 ? (
+              <span className="text-gray-400">
+                No spending yet in {getCurrencySymbol(budgetCurrency, customCurrencies)} {CURRENCIES.find(c => c.code === budgetCurrency)?.name || customCurrencies.find(c => c.code === budgetCurrency)?.name || budgetCurrency}
+              </span>
+            ) : budget - totalInBudgetCurrency >= 0 ? (
+              <span className="text-gray-400">
+                <span className="text-emerald-400 font-semibold">{getCurrencySymbol(budgetCurrency, customCurrencies)}{(budget - totalInBudgetCurrency).toFixed(2)}</span> left in {getCurrencySymbol(budgetCurrency, customCurrencies)} budget this month
+              </span>
+            ) : (
+              <span className="text-orange-400">
+                {getCurrencySymbol(budgetCurrency, customCurrencies)}{Math.abs(budget - totalInBudgetCurrency).toFixed(2)} over {getCurrencySymbol(budgetCurrency, customCurrencies)} budget
+              </span>
+            )}
+          </div>
+        )}
 
-      {/* Home Tab Bar — shown only when in Home mode */}
-      {appMode === 'home' && (
-        <div className="flex gap-0 mb-6 border-b border-white/[0.08]">
-          {(['personal', 'splits', 'analytics'] as HomeTab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setHomeTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-                homeTab === tab
+        {/* Home Tab Bar — shown only when in Home mode */}
+        {appMode === 'home' && (
+          <div className="flex gap-0 mb-6 border-b border-white/[0.08]">
+            {(['personal', 'splits', 'analytics'] as HomeTab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setHomeTab(tab)}
+                className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${homeTab === tab
                   ? 'border-blue-400 text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-200'
-              }`}
-            >
-              {tab === 'personal' ? 'Personal' : tab === 'splits' ? 'Splits' : 'Analytics'}
-            </button>
-          ))}
-        </div>
-      )}
+                  }`}
+              >
+                {tab === 'personal' ? 'Personal' : tab === 'splits' ? 'Splits' : 'Analytics'}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {/* Conditional View Rendering */}
-      {appMode === 'profile' ? (
-        <ProfileView expenses={expenses} />
-      ) : appMode === 'groups' ? (
-        selectedGroupId ? (
-          <GroupDashboard
-            groupId={selectedGroupId}
-            onBack={() => setSelectedGroupId(null)}
+        {/* ── Tab panels — always mounted, shown/hidden via CSS so components
+           never lose their state or re-fetch data on tab switch ── */}
+
+        {/* Profile tab */}
+        <div className={appMode !== 'profile' ? 'hidden' : ''}>
+          <ProfileView expenses={expenses} />
+        </div>
+
+        {/* Groups tab — GroupList + GroupDashboard share the same panel */}
+        <div className={appMode !== 'groups' ? 'hidden' : ''}>
+          <div className={selectedGroupId ? 'hidden' : ''}>
+            <GroupList onSelectGroup={(id) => setSelectedGroupId(id)} />
+          </div>
+          <div className={!selectedGroupId ? 'hidden' : ''}>
+            {selectedGroupId && (
+              <GroupDashboard
+                groupId={selectedGroupId}
+                onBack={() => setSelectedGroupId(null)}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Home — Splits sub-tab */}
+        <div className={appMode !== 'home' || homeTab !== 'splits' ? 'hidden' : ''}>
+          <DirectSplitsView />
+        </div>
+
+        {/* Home — Analytics sub-tab */}
+        <div className={appMode !== 'home' || homeTab !== 'analytics' ? 'hidden' : ''}>
+          <Visualize
+            expenses={expenses}
+            budget={budget}
+            budgetCurrency={budgetCurrency}
+            customCurrencies={customCurrencies}
+            getCurrencySymbol={(code) => getCurrencySymbol(code, customCurrencies)}
           />
-        ) : (
-          <GroupList onSelectGroup={(id) => setSelectedGroupId(id)} />
-        )
-      ) : homeTab === 'splits' ? (
-        <DirectSplitsView />
-      ) : homeTab === 'analytics' ? (
-        <Visualize
-          expenses={expenses}
-          budget={budget}
-          budgetCurrency={budgetCurrency}
-          customCurrencies={customCurrencies}
-          getCurrencySymbol={(code) => getCurrencySymbol(code, customCurrencies)}
-        />
-      ) : (
-        <>
+        </div>
+
+        {/* Home — Personal sub-tab (default) */}
+        <div className={appMode !== 'home' || homeTab !== 'personal' ? 'hidden' : ''}>
           {/* Add Expense Form */}
           <div className="mb-12 border border-white/[0.09] rounded-xl p-5 bg-white/[0.04] backdrop-blur-sm transition-all hover:bg-white/[0.06]">
             <form onSubmit={addExpense} className="flex flex-col gap-5">
@@ -951,7 +1044,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
                                       ))}
                                     </div>
                                   </div>
-<div className="flex-1 h-px bg-white/[0.08]"></div>
+                                  <div className="flex-1 h-px bg-white/[0.08]"></div>
                                 </div>
 
                                 {/* Expenses for this date */}
@@ -1139,9 +1232,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
               />
             </div>
           )}
-        </>
-      )
-      }
+
+        </div>{/* end personal tab panel */}
+      </div>{/* end max-w-4xl content div */}
 
       {/* Undo Delete Snackbar — sits above the 68px bottom nav */}
       {deletedExpense && (
@@ -1195,15 +1288,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       {/* Migration Modal */}
       <MigrationModal
         isOpen={isMigrationModalOpen}
-        expenseCount={expenses.length}
+        localExpenseCount={expenses.length}
         onMigrate={async () => {
           if (user) {
             await DataSyncService.migrateLocalExpenses(expenses, user.id);
+            localStorage.setItem('migration_dismissed_v1', 'true');
             setHasCheckedMigration(true);
             setIsMigrationModalOpen(false);
           }
         }}
         onSkip={() => {
+          localStorage.setItem('migration_dismissed_v1', 'true');
           setHasCheckedMigration(true);
           setIsMigrationModalOpen(false);
         }}
@@ -1367,49 +1462,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onBack }) => {
       )}
 
     </div>
-    </div>
   );
 };
-
-// Expanded palette for deterministic coloring
-const PASTEL_COLORS = [
-  'bg-gray-100 text-gray-700',
-  'bg-orange-100 text-orange-800',
-  'bg-yellow-100 text-yellow-800',
-  'bg-green-100 text-green-800',
-  'bg-blue-100 text-blue-800',
-  'bg-purple-100 text-purple-800',
-  'bg-pink-100 text-pink-800',
-  'bg-red-100 text-red-800',
-  'bg-teal-100 text-teal-800',
-  'bg-indigo-100 text-indigo-800',
-  'bg-rose-100 text-rose-800',
-  'bg-cyan-100 text-cyan-800',
-  'bg-amber-100 text-amber-800',
-  'bg-lime-100 text-lime-800',
-  'bg-emerald-100 text-emerald-800',
-  'bg-violet-100 text-violet-800',
-  'bg-fuchsia-100 text-fuchsia-800',
-];
-
-function getCategoryColor(category: string): string {
-  const normalized = category.trim().toLowerCase();
-
-  // Specific Overrides for Default Categories
-  if (normalized === 'food') return 'bg-orange-100 text-orange-800';
-  if (normalized === 'travel') return 'bg-emerald-100 text-emerald-800';
-  if (normalized === 'shopping') return 'bg-blue-100 text-blue-800';
-  if (normalized === 'bills') return 'bg-red-100 text-red-800';
-  if (normalized === 'other') return 'bg-gray-100 text-gray-600';
-
-  // Deterministic color assignment
-  let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  const index = Math.abs(hash) % PASTEL_COLORS.length;
-  return PASTEL_COLORS[index];
-}
 
 export default Workspace;
